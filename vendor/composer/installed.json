@@ -1,0 +1,39 @@
+[
+    {
+        "name": "hhvm/hsl",
+        "version": "v4.5.0",
+        "version_normalized": "4.5.0.0",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/hhvm/hsl.git",
+            "reference": "97e555a0ca3ec346c659fb3b5aec769be1242fbe"
+        },
+        "dist": {
+            "type": "zip",
+            "url": "https://api.github.com/repos/hhvm/hsl/zipball/97e555a0ca3ec346c659fb3b5aec769be1242fbe",
+            "reference": "97e555a0ca3ec346c659fb3b5aec769be1242fbe",
+            "shasum": ""
+        },
+        "require": {
+            "hhvm": "^4.3"
+        },
+        "require-dev": {
+            "facebook/fbexpect": "^2.5.1",
+            "hhvm/hacktest": "^1.0",
+            "hhvm/hhvm-autoload": "^2.0"
+        },
+        "time": "2019-05-13T17:13:14+00:00",
+        "type": "library",
+        "extra": {
+            "branch-alias": {
+                "dev-master": "4.x-dev"
+            }
+        },
+        "installation-source": "dist",
+        "notification-url": "https://packagist.org/downloads/",
+        "license": [
+            "MIT"
+        ],
+        "description": "The Hack Standard Library"
+    }
+]

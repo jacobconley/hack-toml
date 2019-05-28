@@ -1,0 +1,17 @@
+{
+	"folders":
+	[
+		{
+			"path": "."
+		}
+	],
+
+	"build_systems": 
+	[
+		{
+			"cmd": 	  "hh_client",
+		    "target": "ansi_color_build",
+		    "syntax": "Packages/ANSIescape/ANSI.tmLanguage"
+		}
+	]
+}
