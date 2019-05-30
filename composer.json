@@ -2,6 +2,7 @@
 	"name": "jacobconley/hack-toml",
 	"description": "A TOML library for the Hack language",
 	"require": {
-		"hhvm/hsl": "^4.5"
+		"hhvm/hsl": "^4.5",
+		"hhvm/hhvm-autoload": "^2.0"
 	}
 }

@@ -6,4 +6,5 @@ $vendorDir = dirname(dirname(__FILE__));
 $baseDir = dirname($vendorDir);
 
 return array(
+    'Facebook\\AutoloadMap\\ComposerPlugin' => $vendorDir . '/hhvm/hhvm-autoload/src/ComposerPlugin.php',
 );

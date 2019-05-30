@@ -6,9 +6,14 @@ namespace Composer\Autoload;
 
 class ComposerStaticInit0784888408c64fe080de32b73859dff9
 {
+    public static $classMap = array (
+        'Facebook\\AutoloadMap\\ComposerPlugin' => __DIR__ . '/..' . '/hhvm/hhvm-autoload/src/ComposerPlugin.php',
+    );
+
     public static function getInitializer(ClassLoader $loader)
     {
         return \Closure::bind(function () use ($loader) {
+            $loader->classMap = ComposerStaticInit0784888408c64fe080de32b73859dff9::$classMap;
 
         }, null, ClassLoader::class);
     }
