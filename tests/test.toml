@@ -1,1 +1,10 @@
-test thing = "yaa" blaa
+test thing = "yaaa" blaa
+
+derpen true ='''
+	testington
+'''
+
+cock """
+shit pi\  
+	ss
+"""
