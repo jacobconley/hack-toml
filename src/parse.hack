@@ -48,6 +48,8 @@ enum tokenType : int {
 	EOL 				= 50;
 	EOF 				= 51;
 	COMMENT 			= 55;
+
+	ERROR 				= 100;
 }
 
 enum valueType : int { 
@@ -61,6 +63,8 @@ enum valueType : int {
 	INLINE_DICT 		= 71;
 	ARRAY 				= 80;
 
+	EMPTY 				= 91; 
+
 }
 
 
@@ -72,7 +76,7 @@ class token {
 
 	private int $line;
 	private int $col;
-	private ?string $text;
+	private string $text;
 	private tokenType $type;
 
 	public function getLine() : int 		{ return $this->line; }
@@ -82,38 +86,65 @@ class token {
 
 	public function getPosition() : position { return tuple($this->line, $this->col); }
 
-	public function __construct(tokenType $type, int $line, int $col, ?string $text = ''){
+	public function __construct(tokenType $type, int $line, int $col, string $text = ''){
 		$this->line = $line;
 		$this->col = $col;
 		$this->text = $text;
 		$this->type = $type;
 	}
 
-	public function getTypeString() : string { 
-		return '[TYPE]';
+	public static function EnumToString(int $val) : ?string { 
+		switch($val) { 
+			case tokenType::KEY: 		return 'Key';
+			case tokenType::INTEGER: 	return 'Integer';
+			case tokenType::FLOAT: 		return 'Float';
+			case tokenType::BOOL: 		return 'Boolean';
+			case tokenType::DATETIME: 	return 'DateTime';
+			case tokenType::STRING:		return 'String';
+
+			case tokenType::EOL: 		return "end-of-line";
+			case tokenType::EOF: 		return "end-of-file";
+			case tokenType::COMMENT: 	return "Comment";
+
+			case valueType::INLINE_DICT:return "Inline table";
+			case valueType::ARRAY: 		return "Array";
+			case valueType::EMPTY: 		return "Empty";
+			default: 					return NULL;
+		}
 	}
 
-	public function isString() : bool { return ($this->type == tokenType::STRING || $this->type == tokenType::STRING_MULTILINE); }
+	public function getTypeString() : string { return token::EnumToString((int) $this->type) ?? $this->text; }
+
 	public function isEndAnchor() : bool { return ($this->type == tokenType::EOL) || ($this->type == tokenType::EOF); }
-	public function isValue() : bool { 
-		switch($this->type) { 
-			default: return false; 
-		}
-		return false; 
+
+	public function getValueType() : ?valueType { 
+		$int = (int) $this->type; 
+		if($int >= 10 && $int < 20) return $int as valueType;
+		else return NULL;
 	}
 
 	public function getValue() : nonnull { 
-		if(! $this->isValue()) throw new LogicException("This token is not a value type");
-		if($this->isString()) return $this->text; 
+		if($this->getValueType() is null) throw new LogicException("This token is not a value type");
 
 		switch($this->type) {
-			case tokenType::INTEGER: 		return \intval($this->text);
-			case tokenType::FLOAT: 			return \doubleval($this->text);
+
+			case tokenType::INTEGER: 		
+				$text =	Str\replace($this->text, '_', ''); 		// Idk if PHP handles underscores, docs are shit 
+				$text = Str\replace($this->text, '0o', '0'); 	// Since the validity was guaranteed earlier, the only 0o could be at the beginning
+																// intval() uses a leading 0 to mean it's octal 
+
+				return \intval($text);
+
+			case tokenType::FLOAT: 			
+				$text =	Str\replace($this->text, '_', ''); 		
+				return \doubleval($text);
 
 			case tokenType::BOOL:
 				if($this->text === "true") return TRUE;
 				else return FALSE;
 
+
+			case tokenType::STRING: 		return $this->text;
 			case tokenType::DATETIME:		return new \DateTime($this->text);
 
 			default:						throw new LogicException("Type not handled in value()");
@@ -123,114 +154,328 @@ class token {
 
 
 
-
 //
-// Lexer frames
-// This is not implemented in a true stack; rather, there is one frame at a time, and frames can switch
-// 	to one another by returning a new frame in lexc()
+//
+// Lexing
+//
 //
 
 
-abstract class context_lexer { 
+
+class Lexer { 
 
 	protected Decoder $parent;
 	protected int $line = 1; 
-	protected int $col = 0; 
 
-	public function __construct(Decoder $parent, int $lineNum, int $colNum = 1) { 
+	public function __construct(Decoder $parent) { 
 		$this->parent = $parent;
-		$this->position = $parent->getPosition();
-		$this->line = $lineNum; 
-		$this->col = $colNum;
 	}
 
 
-	/**
-	 * Process the current character $char.  Return $this to keep current frame, nonnull to replace, null to pop 
-	 */
-	public final function handleLine(string $line, int $lineNum) { 
-		$this->line = $lineNum; 
+	// 
+	// Helper functions
+	//
 
-		for($n = 0; $n < \strlen($line); throw new LogicException("Incomplete lexer")) { 
+	protected final function getPosition() : position { return tuple($this->line, $this->n); }
+	public final function getLineNum() : int { return $this->parent->getLineNum(); }
+	public final function getParent() : Decoder { return $this->parent; }
 
-			switch($line[$n]) { 
-				case "\t": 
-					$this->col += 4; $n++; continue; 
-				case ' ':
-					$this->col += 1; $n++; continue; 
-				default: 
-					$this->col += 1; break; 
-			}
+	private function token(tokenType $type, string $value) : void {
+		$this->parent->handleToken(new token($type, $this->line, $this->n, $value));  
+	}
 
-			$this->n = $n; 
-			$this->string = $lineText; 
-
-			if($this->LEX()) {
-				$n = $this->n; 
-				continue; 
-			}
+	protected final function try<T as Regex\Match>(Regex\Pattern<T> $pattern) : ?Regex\Match { 		
+		if($match = Regex\first_match($this->lineText, $pattern, $this->n)) { 
+			/* HH_IGNORE_ERROR[4108] The field 0 is always defined - bad typechecker! */
+			$this->n += Str\length($match[0]); 
+			return $match;
 		}
+		else return NULL; 
 	}
 
-	private int $n; 
-	private ?string $lineText; 
-
-	protected final function try(Regex\Pattern $pattern) : ?Regex\Match { 
-		if($line = $this->lineText) { 			
-			return Regex\first_match($line, re"", $this->n);
-		}
-		else throw new LogicException("No line text set in lexer"); 
+	protected final function is(string $str) : ?string { 
+		if(Str\starts_with($this->lineText, $str)) { 
+			$this->n += Str\length($str); 
+			return $str;
+		} 
+		else return NULL;
 	}
 
-	protected abstract function LEX() : ?string;
+	//
+	// Lexing
+	//
 
-	protected final function getPosition() : position { return tuple($this->line, $this->col); }
-	protected function token(tokenType $type, ?string $value = NULL) : void {
-		$this->parent->handleToken(new token($type, $this->line, $this->col, $value));  
-	}
-
-}
-
-
-class lexerRoot extends content_lexer { 
 
 	private bool $expectKey = FALSE; 
 	public function expectKey() : void { $this->expectKey = TRUE; }
 
-	protected abstract function LEX() : ?string { 
+	// Helper functions for String Handler
+	public function isExpectingKey() : bool { return $this->expectKey; }
+	public function handleStringKey(string $value) : void { 
+		$this->expectKey = FALSE; 
+		$this->token(tokenType::KEY, $value);
+	}
 
-		//
-		// Looking for strings first 
-		// 
-		if($match = $this->try(re"/^'''/")) { 
-		}
 
-		if($match = $this->try(re"/^\"\"\"/")) { 
-		}
+	private int $n = 0;
+	private string $lineText = '';  // dummy init value 
 
-		if($match = $this->try(re"/^'/")) { 
-		}
+	private ?StringHandler $StringHandler; 
 
-		if($match = $this->try(re"/^\"/")) { 
+	/**
+	 * Process the current character $char.  Return $this to keep current frame, nonnull to replace, null to pop 
+	 */
+	public final function handleLine(string $line, int $lineNum, int $offset = 0) : void { 
+		$this->line 	= $lineNum; 
+		$this->lineText = $line; 
 
-		}
+		for($n = $offset; $n < \strlen($line); $this->n = $n) { 
 
-		//
-		// Prioritize bare keys, if expected
-		//
-		if($this->expectKey) { 
-			if($match = $this->try(re"/^[a-zA-Z0-9_-]+\b/")){
-				$this->expectKey = FALSE; 
-				return $match[0]; 
+			// First - see if there is a string context
+			// If there is, it will return a new $n offset to skip to if it finishes, or NULL which means it continues into the next line as well
+			if($handler = $this->StringHandler) { 
+				if($newOffset = $handler->handleLine($line, $lineNum, $n)) { 
+					// String is ending, its token has already been handled by the StringHandler so we advance to the new offset
+					$this->StringHandler = NULL;
+					$n = $newOffset; 
+					continue;
+				}
+				else return; 
 			}
-			else throw new TOMLException($this->getPosition(), "Expected a key ")
-		}
 
-		// 
+			if(\ctype_space($line[$n])){ $n++; continue; }
+
+			if($line[$n] == "#") { $this->token(tokenType::COMMENT, '#'); return;  }
+
+
+			//
+			// "Normal" lexing
+			//
+
+			//
+			// Looking for strings first 
+			// 
+
+			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
+			if($match = $this->is('"""')) { 
+				if($this->expectKey) throw new TOMLException($this->getPosition(), "Expected a key, cannot use a multi-line string");
+
+				$this->StringHandler = new StringHandler($this, $this->getPosition(), $match);
+				continue;
+			}
+
+			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
+			if($match = $this->is("'''")) { 
+				if($this->expectKey) throw new TOMLException($this->getPosition(), "Expected a key, cannot use a multi-line string");
+
+				$this->StringHandler = new StringHandler($this, $this->getPosition(), $match);
+				continue;
+			}
+
+			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
+			if($match = $this->is('"')) {
+				$this->StringHandler = new StringHandler($this, $this->getPosition(), $match);
+				continue;
+			}
+
+			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
+			if($match = $this->is("'")) { 
+				$this->StringHandler = new StringHandler($this, $this->getPosition(), $match);
+				continue;
+			}
+
+			//
+			// Operators
+			//
+
+			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
+			if($match = $this->is('[[')) { $this->token(tokenType::OP_DB_BRACKET_OPEN, $match); 	continue; }
+			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
+			if($match = $this->is(']]')) { $this->token(tokenType::OP_DB_BRACKET_CLOSE, $match); 	continue; }
+			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
+			if($match = $this->is('['))  { $this->token(tokenType::OP_BRACKET_OPEN, $match); 		continue; }
+			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
+			if($match = $this->is(']'))  { $this->token(tokenType::OP_BRACKET_CLOSE, $match); 		continue; } 
+			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
+			if($match = $this->is('{'))  { $this->token(tokenType::OP_BRACE_OPEN, $match); 			continue; }
+			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
+			if($match = $this->is('}'))  { $this->token(tokenType::OP_BRACE_CLOSE, $match); 		continue; } 
+			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
+			if($match = $this->is('.'))  { $this->token(tokenType::OP_DOT, $match); 				continue; }
+			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
+			if($match = $this->is('='))  { $this->token(tokenType::OP_EQUALS, $match); 				continue; }
+			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
+			if($match = $this->is(','))  { $this->token(tokenType::OP_COMMA, $match); 				continue; }
+
+			//
+			// Prioritize bare keys, if expected
+			//
+			if($this->expectKey) { 
+				if($match = Regex\first_match($line, re"/^[a-zA-Z0-9_-]+\b/", $n))
+				{
+					$this->expectKey = FALSE; 
+					$this->token(tokenType::KEY, $match[0]);
+					continue; 
+				}
+				else throw new TOMLException($this->getPosition(), "Expected a key here");
+			}
+
+			//
+			// Value types 
+			// 
+
+			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
+			if($match = $this->is('true')) 	{ $this->token(tokenType::BOOL, $match); 	continue; }
+			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
+			if($match = $this->is('false')) { $this->token(tokenType::BOOL, $match); 	continue; }
+
+			// Datetime 
+			if($match = Regex\first_match($line, re"/^\d{4}-\d\d-\d\d(T| )\d\d:\d\d:\d\d(\.\d+)?(Z|((\+|-)\d\d:\d\d))?/", $n)) { 
+				$this->token(tokenType::DATETIME, $match[0]); 		
+				continue; 
+			}
+
+			// Number
+			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
+			if($match = Regex\first_match($line, re"/0x[0-9a-f_]+|0o[0-7_]|0b[01_]|[\+-]?(inf|nan|(0|[1-9]([0-9_])*(\.[0-9_]+)?)([eE][\+-]?[0-9_]+)?)/", $n)) { 
+				if(!(Str\is_empty($match[4]) && Str\is_empty($match[5])) || Str\starts_with($match[0], '0')) 	$this->token(tokenType::FLOAT, $match[0]); 
+				else 																							$this->token(tokenType::INTEGER, $match[0]); 
+			}
+
+			throw new TOMLException($this->getPosition(), "Unrecognized input");
+		}
+	}
+}
+
+
+class StringHandler { 
+	private Lexer $parent; 
+
+	private string $value = ""; 
+	private position $pos; 
+
+	private string $delim; 
+	private bool $literal, $multiline; 
+
+	public function __construct(Lexer $parent, position $pos, string $delim) { 
+		$this->parent = $parent; 
+		$this->pos = $pos; 
+		$this->delim = $delim; 
+
+		switch($delim) { 
+			case '"':		$this->literal = FALSE; $this->multiline = FALSE; 	break;
+			case "'":		$this->literal = TRUE; 	$this->multiline = FALSE; 	break;
+			case '"""':		$this->literal = FALSE; $this->multiline = TRUE; 	break; 
+			case "'''":	 	$this->literal = TRUE; 	$this->multiline = TRUE; 	break; 
+			default: 		throw new LogicException("Unrecognized delimiter in string handler");
+		}
 
 	}
 
+
+	private bool $trimmingWS = FALSE; 
+	public function trimWS() : void { $this->trimmingWS = TRUE; }
+
+	// Returns NULL if string is still going, or offset if it ends
+	
+	public final function handleLine(string $line, int $lineNum, int $offset) : ?int
+	{ 
+		if($this->trimmingWS) { 
+			$max = Str\length($line) - 1; 
+			for($i = $offset; $i <= $max; $i++) { 
+				if(\ctype_space($line[$i])) continue; 
+
+				if($i == $max) return $max; // Line ended with no word characters
+
+				$offset = $i; 
+				$this->trimmingWS = FALSE; 
+				break; 
+			}
+		}
+
+
+		// Newline immediately following opening multiline delim, ignored and continued 
+		if($this->multiline && Str\is_empty($line)) return NULL; 
+
+		for($i = $offset; $i < Str\length($line); $i++) { 
+			$char = $line[$i];
+
+			// Escape sequence
+			if($char == '\\' && !($this->literal)) { 
+				if($match = Regex\first_match($line, re"/^\\(U[a-fA-F0-9]{8}|u[a-fA-F0-9]{4}|.)/", $i + 1)) { 
+
+					$char = $match[1][0];
+
+					// Unicode encoding
+					if($char == 'u' || $char == 'U') { 
+						$len = ($char == 'u' ? 4 : 8);
+						for($x = 1; $x <= $len; $x += 2) $this->value .= \hexdec($match[1][$x].$match[1][$x + 1]);
+						$i += $len;
+						continue;
+					}
+
+					// Escape sequence
+					switch($match[1][0]) { 
+						case 'b': 	$this->value .= "\b";  break;
+						case 't': 	$this->value .= "\t";  break; 
+						case 'n': 	$this->value .= "\n";  break; 
+						case 'f': 	$this->value .= "\f";  break; 
+						case 'r': 	$this->value .= "\r";  break; 
+						case '\\': 	$this->value .= "\\";  break; 
+						case '"': 	$this->value .= '"';   break; 
+						default: throw new LogicException('Matched escape literal not handled in following switch');
+					}
+
+					$i += 2; 
+					continue; 
+
+				}
+				else throw new TOMLException(tuple($lineNum, $i), "Unrecognized escape sequence '".$char."'"); 
+			} 
+
+
+			// handling closing delimiter
+			if($char == $this->delim[0]) { 
+
+				$len = 1; 
+				if($this->multiline) 
+				{ 
+					$len = 3; 
+
+					// Incomplete closer
+					if(Str\slice($line, $len) != $this->delim) { 
+						$this->value .= $char; 
+						continue; 
+					}
+				}
+
+				else { 
+					if($this->parent->isExpectingKey()) $this->parent->handleStringKey($this->value); 
+					else $this->parent->getParent->handleToken(new token(
+						tokenType::STRING,
+						$this->pos[0], $this->pos[1],
+						$this->value
+					));
+					return $offset + $len;
+				}
+			} 
+
+			$this->value .= $char;
+		}
+
+		if($this->multiline) { 
+			$this->value .= "\n";
+			return NULL; 
+		}
+		else throw new TOMLException(tuple($lineNum, $i), "Incomplete string literal"); 
+	}
 }
+
+
+
+
+
+
 
 
 
@@ -244,6 +489,22 @@ class lexerRoot extends content_lexer {
 // Grammatical analysis
 //
 //
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 abstract class parserContext 
@@ -262,7 +523,7 @@ abstract class parserContext
 
 interface parser_value {
 	require extends parserContext;
-	public function handleValue(nonnull $value) : void; 
+	public function handleValue(token $token, nonnull $value, valueType $type, ?valueType $subtype = NULL) : void; 
 }
 
 
@@ -291,7 +552,7 @@ class parserKey extends parserContext {
 	{ 
 		if($this->dotting) 
 		{ 
-			if($token->isString()) { 
+			if($token->getType() == tokenType::KEY) { 
 				$this->keys[] = $token->getText(); 
 				$this->dotting = FALSE;
 			}
@@ -320,20 +581,27 @@ class parserValue extends parserContext implements parser_value {
 	}
 
 	public function handleToken(token $token) : void { 
-		if($token->isValue()) { 
+		if($type = $token->getValueType()) { 
 			$this->decoder->parserPop();
-			$this->parent->handleValue($token->getValue());
+			$this->parent->handleValue($token, $token->getValue(), $type);
 			return; 
 		}
 
 		else if($token->getType() == tokenType::OP_BRACE_OPEN) { 
-			$this->decoder->parserPush(new parserInlineDict($this));
+			$this->decoder->parserPush(new parserInlineDict($this, $token));
+			return;
 		}
+
+		else if($token->getType() == tokenType::OP_BRACKET_OPEN) { 
+			$this->decoder->parserPush(new parserArray($this, $token)); 
+		}
+
+		else throw new TOMLException($token->getPosition(), "Expected a value type here"); 
 	}
 
-	public function handleValue(nonnull $value) : void { 
+	public function handleValue(token $token, nonnull $value, valueType $type, ?valueType $subtype = NULL) : void { 
 		$this->decoder->parserPop();
-		$this->parent->handleValue($value); 
+		$this->parent->handleValue($token, $value, $type, $subtype); 
 	}
 }
 
@@ -341,8 +609,10 @@ class parserValue extends parserContext implements parser_value {
 class parserArray extends parserContext implements parser_value { 
 	private parserValue $parent; 
 	private vec<nonnull> $vec = vec<nonnull>[]; 
+	private ?valueType $subtype; 
+	private token $init; 
 
-	public function __construct(parserValue $parent) { 
+	public function __construct(parserValue $parent, token $init) { 
 		$this->parent = $parent; 
 		parent::__construct($parent->decoder);
 
@@ -358,43 +628,16 @@ class parserArray extends parserContext implements parser_value {
 		}
 
 		$this->decoder->parserPop();
-		$this->parent->handleValue($this->vec); 
+		$this->parent->handleValue($this->init, $this->vec, valueType::ARRAY, $this->subtype ?? valueType::EMPTY); 
 	}
 
 
-	public function handleValue(nonnull $value) : void { 
+	public function handleValue(token $token, nonnull $value, valueType $type, ?valueType $subtype = NULL) : void { 
 
-		//TODO: Type guarantees
+		if($this->subtype != NULL && $x != $this->subtype) throw new TOMLException($token->getPosition(), \sprintf('Member of type %s in array previously of type %s', Token::EnumToString($type) ?? '-', Token::EnumToString($type) ?? '-'));
+		else $this->subtype = $type; 
+		
 		$this->vec[] = $value; 
-	}
-}
-
-class parserInlineDict extends parserBase { 
-	private parserValue $parent; 
-
-	public function __construct(parserValue $parent) { 
-		$this->parent = $parent; 
-		parent::__construct($parent->decoder);
-	}
-
-
-	public function handleToken(token $token) : void {
-
-		if($this->expectLineEnd) {
-			if($token->getType() == tokenType::OP_COMMA) { 
-				$this->expectLineEnd = FALSE; 
-				return; 
-			}
-			else throw new TOMLException($token->getPosition(), "Expected comma (,) to separate entries in inline table"); 
-		}
-
-		if($token->getType() == tokenType::OP_BRACE_CLOSE) { 
-			$this->decoder->parserPop();
-			$this->parent->handleValue($this->dict); 
-			return; 
-		}
-
-		parent::handleToken($token); 
 	}
 }
 
@@ -506,7 +749,7 @@ class parserBase extends parserContext implements parser_value {
 		//
 
 
-		if($token->isString()) { 
+		if($token->getType() == tokenType::STRING) { 
 			$kp = new parserKey($this);
 			$kp->handleToken($token); 
 			$this->decoder->parserPush($kp); 
@@ -539,6 +782,39 @@ class parserRoot extends parserBase {
 		}
 	}
 }
+
+class parserInlineDict extends parserBase { 
+	private parserValue $parent; 
+	private token $init; 
+
+	public function __construct(parserValue $parent, token $init) { 
+		$this->parent = $parent; 
+		$this->init = $init; 
+		parent::__construct($parent->decoder);
+	}
+
+
+	public function handleToken(token $token) : void {
+
+		if($this->expectLineEnd) {
+			if($token->getType() == tokenType::OP_COMMA) { 
+				$this->expectLineEnd = FALSE; 
+				return; 
+			}
+			else throw new TOMLException($token->getPosition(), "Expected comma (,) to separate entries in inline table"); 
+		}
+
+		if($token->getType() == tokenType::OP_BRACE_CLOSE) { 
+			$this->decoder->parserPop();
+			$this->parent->handleValue($this->init, $this->dict, valueType::INLINE_DICT); 
+			return; 
+		}
+
+		parent::handleToken($token); 
+	}
+}
+
+
 
 /**
  * Parser context representing the body of a [dictionary] 
@@ -690,10 +966,10 @@ class Decoder {
 			if($lexer = $this->lexer) { 
 				if($char == "\n") { 
 					$this->lineNum++; 
-					$lexer->handleLine($this->line); 
+					$lexer->handleLine($this->line, $this->lineNum); 
 					$this->handleToken(new Token(tokenType::EOL));
 				}
-				else 
+				else $this->line .= $char; 
 			}
 			else throw new LogicException("No lexer set");
 		}
