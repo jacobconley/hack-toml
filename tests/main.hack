@@ -7,22 +7,25 @@ function main() : noreturn {
 
 	$Decoder = new Decoder();
 
-	// try { 
-	// 	$result = $Decoder->DecodeFile(__DIR__.'/test.toml');
-	// }
-	// catch (TOMLException $e) {
-	// 	printf("\nTOML Error:    %s\n", $e->getMessage());
-	// }
-	// catch (Exception $e) {
-	// 	echo 'Exception!    ';
-	// 	echo $e->getMessage()."\n";
-	// 	echo $e->getTraceAsString()."\n";
-	// }
+	try { 
+		$result = $Decoder->DecodeFile(__DIR__.'/test.toml');
 
-	// echo "\n -- Tokens -- \n";
+		echo "\n -- Result -- \n";
+		print_r($result); 
+	}
+	catch (TOMLException $e) {
+		printf("\nTOML Error:    %s\n", $e->getMessage());
+	}
+	catch (Exception $e) {
+		echo 'Exception!    ';
+		echo $e->getMessage()."\n";
+		echo $e->getTraceAsString()."\n";
+	}
 
-	// $tokens = $Decoder->getTokens(); 
-	// foreach($tokens as $token) { printf("%s\n", $token->toString()); }
+	echo "\n -- Tokens -- \n";
+
+	$tokens = $Decoder->getTokens(); 
+	foreach($tokens as $token) { printf("%s\n", $token->toString()); }
 
 	exit(0);
 

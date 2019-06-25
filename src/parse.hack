@@ -13,7 +13,7 @@ class TOMLException extends \Exception {
 	}
 }
 class TOMLUnexpectedException extends TOMLException { 
-	public function __construct(token $token) {
+	public function __construct(Token $token) {
 		parent::__construct($token->getPosition(), 'Unexpected '.$token->getTypeString());
 	}
 }
@@ -68,7 +68,7 @@ enum valueType : int {
 }
 
 
-class token { 
+class Token { 
 
 	public function toString() : string { 
 		return \sprintf("(%s,%s)\t%d\t:%s", $this->line, $this->col, $this->type, $this->text);
@@ -113,7 +113,7 @@ class token {
 		}
 	}
 
-	public function getTypeString() : string { return token::EnumToString((int) $this->type) ?? $this->text; }
+	public function getTypeString() : string { return Token::EnumToString((int) $this->type) ?? $this->text; }
 
 	public function isEndAnchor() : bool { return ($this->type == tokenType::EOL) || ($this->type == tokenType::EOF); }
 
@@ -124,7 +124,7 @@ class token {
 	}
 
 	public function getValue() : nonnull { 
-		if($this->getValueType() is null) throw new LogicException("This token is not a value type");
+		if($this->getValueType() is null) throw new LogicException("This Token is not a value type");
 
 		switch($this->type) {
 
@@ -181,7 +181,8 @@ class Lexer {
 	public final function getParent() : Decoder { return $this->parent; }
 
 	private function token(tokenType $type, string $value) : void {
-		$this->parent->handleToken(new token($type, $this->line, $this->n, $value));  
+		$this->parent->handleToken(new Token($type, $this->line, $this->n, $value));  
+		$this->n += Str\length($value); 
 	}
 
 	protected final function try<T as Regex\Match>(Regex\Pattern<T> $pattern) : ?Regex\Match { 		
@@ -229,7 +230,7 @@ class Lexer {
 		$this->line 	= $lineNum; 
 		$this->lineText = $line; 
 
-		for($n = $offset; $n < \strlen($line); $this->n = $n) { 
+		for($n = $offset; $n < \strlen($line); $n = $this->n) { 
 
 			// First - see if there is a string context
 			// If there is, it will return a new $n offset to skip to if it finishes, or NULL which means it continues into the next line as well
@@ -402,7 +403,7 @@ class StringHandler {
 
 			// Escape sequence
 			if($char == '\\' && !($this->literal)) { 
-				if($match = Regex\first_match($line, re"/^\\(U[a-fA-F0-9]{8}|u[a-fA-F0-9]{4}|.)/", $i + 1)) { 
+				if($match = Regex\first_match($line, re"/^\\\\(U[a-fA-F0-9]{8}|u[a-fA-F0-9]{4}|.)/", $i + 1)) { 
 
 					$char = $match[1][0];
 
@@ -451,7 +452,7 @@ class StringHandler {
 
 				else { 
 					if($this->parent->isExpectingKey()) $this->parent->handleStringKey($this->value); 
-					else $this->parent->getParent->handleToken(new token(
+					else $this->parent->getParent()->handleToken(new Token(
 						tokenType::STRING,
 						$this->pos[0], $this->pos[1],
 						$this->value
@@ -515,7 +516,7 @@ abstract class parserContext
 		$this->decoder = $decoder;
 	}
 
-	public abstract function handleToken(token $token) : void;
+	public abstract function handleToken(Token $token) : void;
 
 	protected function pop() : void { $this->decoder->parserPop(); }
 }
@@ -523,7 +524,7 @@ abstract class parserContext
 
 interface parser_value {
 	require extends parserContext;
-	public function handleValue(token $token, nonnull $value, valueType $type, ?valueType $subtype = NULL) : void; 
+	public function handleValue(Token $token, nonnull $value, valueType $type, ?valueType $subtype = NULL) : void; 
 }
 
 
@@ -548,7 +549,7 @@ class parserKey extends parserContext {
 
 	private bool $dotting = FALSE; 
 
-	public function handleToken(token $token) : void 
+	public function handleToken(Token $token) : void 
 	{ 
 		if($this->dotting) 
 		{ 
@@ -580,7 +581,7 @@ class parserValue extends parserContext implements parser_value {
 		parent::__construct($parent->decoder);
 	}
 
-	public function handleToken(token $token) : void { 
+	public function handleToken(Token $token) : void { 
 		if($type = $token->getValueType()) { 
 			$this->decoder->parserPop();
 			$this->parent->handleValue($token, $token->getValue(), $type);
@@ -599,7 +600,7 @@ class parserValue extends parserContext implements parser_value {
 		else throw new TOMLException($token->getPosition(), "Expected a value type here"); 
 	}
 
-	public function handleValue(token $token, nonnull $value, valueType $type, ?valueType $subtype = NULL) : void { 
+	public function handleValue(Token $token, nonnull $value, valueType $type, ?valueType $subtype = NULL) : void { 
 		$this->decoder->parserPop();
 		$this->parent->handleValue($token, $value, $type, $subtype); 
 	}
@@ -610,16 +611,17 @@ class parserArray extends parserContext implements parser_value {
 	private parserValue $parent; 
 	private vec<nonnull> $vec = vec<nonnull>[]; 
 	private ?valueType $subtype; 
-	private token $init; 
+	private Token $init; 
 
-	public function __construct(parserValue $parent, token $init) { 
+	public function __construct(parserValue $parent, Token $init) { 
 		$this->parent = $parent; 
+		$this->init = $init; 
 		parent::__construct($parent->decoder);
 
 		$this->decoder->parserPush(new parserValue($this)); 
 	}
 
-	public function handleToken(token $token) : void {
+	public function handleToken(Token $token) : void {
 		if($token->isEndAnchor()) return; // Ignore newlines in array 
 
 		if($token->getType() == tokenType::OP_COMMA) { 
@@ -632,9 +634,9 @@ class parserArray extends parserContext implements parser_value {
 	}
 
 
-	public function handleValue(token $token, nonnull $value, valueType $type, ?valueType $subtype = NULL) : void { 
+	public function handleValue(Token $token, nonnull $value, valueType $type, ?valueType $subtype = NULL) : void { 
 
-		if($this->subtype != NULL && $x != $this->subtype) throw new TOMLException($token->getPosition(), \sprintf('Member of type %s in array previously of type %s', Token::EnumToString($type) ?? '-', Token::EnumToString($type) ?? '-'));
+		if($this->subtype != NULL && $type!= $this->subtype) throw new TOMLException($token->getPosition(), \sprintf('Member of type %s in array previously of type %s', Token::EnumToString((int) $type) ?? '-', Token::EnumToString((int) $type) ?? '-'));
 		else $this->subtype = $type; 
 		
 		$this->vec[] = $value; 
@@ -665,7 +667,7 @@ class parserBase extends parserContext implements parser_value {
 		else if($count > 1) {
 			for($i = 0; $i < \count($key) - 1; $i++) { 
 				/* HH_FIXME[4110] No idea why nonnull is incompatible with nonnull */
-				$x = \idx($x, $key[$i], dict<string, nonnull>[]); 
+				$x = idx($x, $key[$i], dict<string, nonnull>[]); 
 			} 
 		}
 
@@ -685,7 +687,7 @@ class parserBase extends parserContext implements parser_value {
 	}
 	public function appendKeyValue(vec<string> $key, dict<string, nonnull> $value) : void 
 	{
-		$vec = \idx($this->topDict($key), $this->topKey($key), vec<dict<string, nonnull>>[]);
+		$vec = idx($this->topDict($key), $this->topKey($key), vec<dict<string, nonnull>>[]);
 		/* HH_IGNORE_ERROR[4101] */
 		if($vec is vec) $vec[] = $value; 
 		else throw new LogicException("Appending to a non-array in appendKeyValue");
@@ -701,7 +703,7 @@ class parserBase extends parserContext implements parser_value {
 		$this->key = $key; 
 	}
 
-	public function handleValue(nonnull $value) : void { 
+	public function handleValue(Token $token, nonnull $value, valueType $type, ?valueType $subtype = NULL) : void { 
 		if($key = $this->key) { 
 			$this->addKeyValue($key, $value); 
 			$this->expectLineEnd = TRUE; 
@@ -717,7 +719,7 @@ class parserBase extends parserContext implements parser_value {
 	// Main method
 	//
 
-	public function handleToken(token $token) : void 
+	public function handleToken(Token $token) : void 
 	{ 
 		//
 		// Context expectations
@@ -763,7 +765,7 @@ class parserBase extends parserContext implements parser_value {
 
 class parserRoot extends parserBase { 
 
-	public function handleToken(token $token) : void { 
+	public function handleToken(Token $token) : void { 
 		switch($token->getType()) { 
 
 			case tokenType::OP_BRACKET_OPEN:
@@ -785,16 +787,16 @@ class parserRoot extends parserBase {
 
 class parserInlineDict extends parserBase { 
 	private parserValue $parent; 
-	private token $init; 
+	private Token $init; 
 
-	public function __construct(parserValue $parent, token $init) { 
+	public function __construct(parserValue $parent, Token $init) { 
 		$this->parent = $parent; 
 		$this->init = $init; 
 		parent::__construct($parent->decoder);
 	}
 
 
-	public function handleToken(token $token) : void {
+	public function handleToken(Token $token) : void {
 
 		if($this->expectLineEnd) {
 			if($token->getType() == tokenType::OP_COMMA) { 
@@ -830,7 +832,7 @@ class parserDictBody extends parserRoot {
 	private bool $opened = FALSE; 
 	private ?vec<string> $dictKey;
 
-	public function handleToken(token $token) : void 
+	public function handleToken(Token $token) : void 
 	{
 		// Gotta override this in two ways:
 		// 1) Handling the declaration stage, when $this->opened is FALSE 
@@ -881,7 +883,7 @@ class parserDictArrayBody extends parserRoot {
 	private bool $opened = FALSE; 
 	private ?vec<string> $dictKey;
 
-	public function handleToken(token $token) : void 
+	public function handleToken(Token $token) : void 
 	{
 
 		if($this->opened)
@@ -938,11 +940,14 @@ newtype position = (int, int);
 function positionString(position $position) : string { return \sprintf('(%d,%d)', $position[0], $position[1]); }
 
 class Decoder { 
-	private ?context_lexer $lexer;
+	private ?Lexer $lexer;
 	private Vector<parserContext> $parsers = Vector<parserContext>{};
 
+	// DEBUG
+	private vec<Token> $tokens = vec<Token>[]; 
+	public function getTokens() : vec<Token> { return $this->tokens; }
 
-	public function handleToken(token $token) : void { 
+	public function handleToken(Token $token) : void { 
 		if($p = $this->parsers->lastValue()) $p->handleToken($token); 
 		else throw new LogicException("No parsers on the stack"); 
 	}
@@ -967,7 +972,7 @@ class Decoder {
 				if($char == "\n") { 
 					$this->lineNum++; 
 					$lexer->handleLine($this->line, $this->lineNum); 
-					$this->handleToken(new Token(tokenType::EOL));
+					$this->handleToken(new Token(tokenType::EOL, $this->lineNum, $i));
 				}
 				else $this->line .= $char; 
 			}
@@ -984,7 +989,7 @@ class Decoder {
 			$this->parseBuffer(\fread($file, 1024));
 		}
 
-		if($lexer = $this->lexer) $this->lexer->EOF(); 
+		if($lexer = $this->lexer) $this->handleToken(new Token(tokenType::EOF, $this->lineNum, 0));
 		else throw new LogicException("No lexer set");
 
 		return dict<string, nonnull>[ ];
