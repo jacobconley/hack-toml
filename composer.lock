@@ -55,16 +55,16 @@
         },
         {
             "name": "hhvm/hsl",
-            "version": "v4.5.0",
+            "version": "v4.7.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/hhvm/hsl.git",
-                "reference": "97e555a0ca3ec346c659fb3b5aec769be1242fbe"
+                "reference": "0150e1f860f6e695c022b0def700ccce46bb5999"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/hhvm/hsl/zipball/97e555a0ca3ec346c659fb3b5aec769be1242fbe",
-                "reference": "97e555a0ca3ec346c659fb3b5aec769be1242fbe",
+                "url": "https://api.github.com/repos/hhvm/hsl/zipball/0150e1f860f6e695c022b0def700ccce46bb5999",
+                "reference": "0150e1f860f6e695c022b0def700ccce46bb5999",
                 "shasum": ""
             },
             "require": {
@@ -86,7 +86,7 @@
                 "MIT"
             ],
             "description": "The Hack Standard Library",
-            "time": "2019-05-13T17:13:14+00:00"
+            "time": "2019-05-31T16:46:29+00:00"
         }
     ],
     "packages-dev": [],

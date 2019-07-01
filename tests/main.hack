@@ -14,11 +14,14 @@ function main() : noreturn {
 		print_r($result); 
 	}
 	catch (TOMLException $e) {
-		printf("\nTOML Error:    %s\n", $e->getMessage());
+		printf("\nTOML Error:    %s\n\n", $e->getMessage());
+		printf("%s:%s\n", $e->getFile(), $e->getLine());
+		echo $e->getTraceAsString()."\n";
 	}
 	catch (Exception $e) {
 		echo 'Exception!    ';
 		echo $e->getMessage()."\n";
+		printf("%s:%s\n", $e->getFile(), $e->getLine());
 		echo $e->getTraceAsString()."\n";
 	}
 
