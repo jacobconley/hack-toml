@@ -5,7 +5,6 @@ require_once __DIR__."/../vendor/hh_autoload.hh";
 use \LogicException;
 use \HH\Lib\{ Str, Regex, Vec }; 
 
-// TODO: Line position here
 class TOMLException extends \Exception {
 	public function __construct(?position $position, string $message) { 
 		if($position = $position) parent::__construct('At '.positionString($position).': '.$message); 
@@ -125,37 +124,44 @@ class Token {
 	}
 
 	public function getValueType() : ?valueType { 
-		$int = (int) $this->type; 
-		if($int >= 10 && $int < 20) return $int as valueType;
-		else return NULL;
+		switch($this->type) { 
+			case tokenType::INTEGER:			return valueType::INTEGER;
+			case tokenType::FLOAT: 				return valueType::FLOAT;
+			case tokenType::BOOL: 				return valueType::BOOL;
+			case tokenType::DATETIME:			return valueType::DATETIME;
+			case tokenType::STRING: 			return valueType::STRING;
+			case tokenType::STRING_M:			return valueType::STRING;
+			default: 							return NULL;
+		}
 	}
 
 	public function getValue() : nonnull { 
-		if($this->getValueType() is null) throw new LogicException("This Token is not a value type");
+		if($type = $this->getValueType()) {
+			switch($type) {
 
-		switch($this->type) {
+				case tokenType::INTEGER: 		
+					$text =	Str\replace($this->text, '_', ''); 		// Idk if PHP handles underscores, docs are shit 
+					$text = Str\replace($this->text, '0o', '0'); 	// Since the validity was guaranteed earlier, the only 0o could be at the beginning
+																	// intval() uses a leading 0 to mean it's octal 
 
-			case tokenType::INTEGER: 		
-				$text =	Str\replace($this->text, '_', ''); 		// Idk if PHP handles underscores, docs are shit 
-				$text = Str\replace($this->text, '0o', '0'); 	// Since the validity was guaranteed earlier, the only 0o could be at the beginning
-																// intval() uses a leading 0 to mean it's octal 
+					return \intval($text);
 
-				return \intval($text);
+				case tokenType::FLOAT: 			
+					$text =	Str\replace($this->text, '_', ''); 		
+					return \doubleval($text);
 
-			case tokenType::FLOAT: 			
-				$text =	Str\replace($this->text, '_', ''); 		
-				return \doubleval($text);
-
-			case tokenType::BOOL:
-				if($this->text === "true") return TRUE;
-				else return FALSE;
+				case tokenType::BOOL:
+					if($this->text === "true") return TRUE;
+					else return FALSE;
 
 
-			case tokenType::STRING: 		return $this->text;
-			case tokenType::DATETIME:		return new \DateTime($this->text);
+				case tokenType::STRING: 		return $this->text;
+				case tokenType::DATETIME:		return new \DateTime($this->text);
 
-			default:						throw new LogicException("Type not handled in value()");
+				default:						throw new LogicException("Type not handled in value()");
+			}
 		}
+		else throw new LogicException("This Token is not a value type");
 	}
 }
 
@@ -188,7 +194,7 @@ class Lexer {
 	public final function getParent() : Decoder { return $this->parent; }
 
 	private function token(tokenType $type, string $value) : void {
-		\printf("TOKEN: %s '%s'\n", Token::EnumToString((int) $type), $value); // DEBUG
+		\printf("\n\nTOKEN: %s '%s'\n", Token::EnumToString((int) $type), $value); // DEBUG
 		$this->parent->handleToken(new Token($type, $this->line, $this->n, $value));  
 		$this->n += Str\length($value); 
 	}
@@ -220,11 +226,24 @@ class Lexer {
 
 	private ?StringHandler $StringHandler; 
 
+
+	public final function EOL() : void { 
+		if($handler = $this->StringHandler) if($handler->isMultiline()) return; 
+		$this->parent->handleToken(new Token(tokenType::EOF, $this->line, 0));
+	}
+
+	public final function EOF() : void { 
+		if($this->StringHandler) throw new TOMLException(NULL, "Unexpected end-of-file in string literal");
+		$this->parent->handleToken(new Token(tokenType::EOF, $this->line, 0));
+	}
+
+
+
 	/**
 	 * Process the current character $char.  Return $this to keep current frame, nonnull to replace, null to pop 
 	 */
 	public final function handleLine(string $line, int $lineNum, int $offset = 0) : void { 
-		\printf("LINE: %s\n", $line); // DEBUG
+		\printf("\n\n---------------\nLINE: %s\n", $line); // DEBUG
 
 		$this->line 	= $lineNum; 
 		// $this->lineText = $line; 
@@ -238,6 +257,7 @@ class Lexer {
 			// First - see if there is a string context
 			// If there is, it will return a new $n offset to skip to if it finishes, or NULL which means it continues into the next line as well
 			if($handler = $this->StringHandler) { 
+				// Remember the string handler uses the entire line, as opposed to the main lexer which slices off each token
 				if($newOffset = $handler->handleLine($line, $lineNum, $n)) { 
 					// String is ending, its token has already been handled by the StringHandler so we advance to the new offset
 					$this->StringHandler = NULL;
@@ -263,24 +283,28 @@ class Lexer {
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
 			if($match = $this->is('"""')) { 
 				$this->StringHandler = new StringHandler($this, $this->getPosition(), $match);
+				$this->n += 3; // have to manually increment since we're not calling token 
 				continue;
 			}
 
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
 			if($match = $this->is("'''")) { 
 				$this->StringHandler = new StringHandler($this, $this->getPosition(), $match);
+				$this->n += 3; // have to manually increment since we're not calling token 
 				continue;
 			}
 
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
 			if($match = $this->is('"')) {
 				$this->StringHandler = new StringHandler($this, $this->getPosition(), $match);
+				$this->n++; // have to manually increment since we're not calling token 
 				continue;
 			}
 
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
 			if($match = $this->is("'")) { 
 				$this->StringHandler = new StringHandler($this, $this->getPosition(), $match);
+				$this->n++; // have to manually increment since we're not calling token 
 				continue;
 			}
 
@@ -354,6 +378,8 @@ class StringHandler {
 	private string $delim; 
 	private bool $literal, $multiline; 
 
+	public final function isMultiline() : bool { return $this->multiline; }
+
 	public function __construct(Lexer $parent, position $pos, string $delim) { 
 		$this->parent = $parent; 
 		$this->pos = $pos; 
@@ -370,6 +396,7 @@ class StringHandler {
 	}
 
 
+	private bool $opened = FALSE; 
 	private bool $trimmingWS = FALSE; 
 	public function trimWS() : void { $this->trimmingWS = TRUE; }
 
@@ -377,6 +404,14 @@ class StringHandler {
 	
 	public final function handleLine(string $line, int $lineNum, int $offset) : ?int
 	{ 
+
+		\printf("STRING LINE at %d: %s\n", $offset, $line); 
+
+
+		// Newline immediately following opening multiline delim, ignored and continued 
+		if($this->multiline && !($this->opened) && Str\is_empty($line)) { $this->opened = TRUE; return NULL; }
+		$this->opened = TRUE; 
+
 		if($this->trimmingWS) { 
 			$max = Str\length($line) - 1; 
 			for($i = $offset; $i <= $max; $i++) { 
@@ -389,10 +424,6 @@ class StringHandler {
 				break; 
 			}
 		}
-
-
-		// Newline immediately following opening multiline delim, ignored and continued 
-		if($this->multiline && Str\is_empty($line)) return NULL; 
 
 		for($i = $offset; $i < Str\length($line); $i++) { 
 			$char = $line[$i];
@@ -432,28 +463,28 @@ class StringHandler {
 
 
 			// handling closing delimiter
-			if($char == $this->delim[0]) { 
+			if($char == $this->delim[0]) {
 
-				$len = 1; 
+				$len = Str\length($this->delim);  
+
 				if($this->multiline) 
 				{ 
-					$len = 3; 
-
 					// Incomplete closer
-					if(Str\slice($line, $len) != $this->delim) { 
+					if(Str\slice($line, $i, $len) != $this->delim) { 
 						$this->value .= $char; 
 						continue; 
 					}
 				}
 
-				else { 
-					$this->parent->getParent()->handleToken(new Token(
-						$this->multiline ? tokenType::STRING_M : tokenType::STRING,
-						$this->pos[0], $this->pos[1],
-						$this->value
-					));
-					return $offset + $len;
-				}
+
+				\printf("\nSTRING: '''%s'''\n", $this->value); // DEBUG
+
+				$this->parent->getParent()->handleToken(new Token(
+					$this->multiline ? tokenType::STRING_M : tokenType::STRING,
+					$this->pos[0], $this->pos[1],
+					$this->value
+				));
+				return $i + $len;
 			} 
 
 			$this->value .= $char;
@@ -564,7 +595,7 @@ class parserKey extends parserContext {
 
 		else { 
 			$this->pop();
-			$this->parent->handleKey($this->keys); 
+			$this->parent->handleKey($this->keys, $token); 
 			$this->parent->handleToken($token); 
 		}
 	}
@@ -594,7 +625,7 @@ class parserValue extends parserContext implements parser_value {
 			$this->decoder->parserPush(new parserArray($this, $token)); 
 		}
 
-		else throw new TOMLException($token->getPosition(), "Expected a value type here"); 
+		else throw new TOMLException($token->getPosition(), "Expected a value type here, got ".Token::EnumToString((int) $token->getType())); 
 	}
 
 	public function handleValue(Token $token, nonnull $value, valueType $type, ?valueType $subtype = NULL) : void { 
@@ -672,11 +703,12 @@ class parserBase extends parserContext implements parser_value {
 		return $str; 
 	}
 
-	private function _addKV(vec<string> $key, nonnull $value, inout dict<string,mixed> $dict) : void { 
+	private function _addKV(vec<string> $key, Token $keyToken, nonnull $value, inout dict<string,mixed> $dict) : void { 
 		$count = \count($key);
 		if($count == 0) throw new LogicException("Empty key");
 
 		else if($count == 1) { 
+			if(\array_key_exists($key[0], $dict)) throw new TOMLException($keyToken->getPosition(), \sprintf('Duplicate key "%s"', $this->keystr($key))); 
 			$dict[$key[0]] = $value; 
 			return;
 		}
@@ -688,15 +720,15 @@ class parserBase extends parserContext implements parser_value {
 			$y = idx($dict, $x, dict<string,nonnull>[]); 
 
 			/* HH_IGNORE_ERROR[4101] Generics */
-			if(!($y is dict)) throw new TOMLException(NULL, \sprintf('Key error for "%s": %s is not a table', $this->keystr($key), $x));
+			if(!($y is dict)) throw new TOMLException($keyToken->getPosition(), \sprintf('"%s": %s is not a table', $this->keystr($key), $x));
 			/* HH_IGNORE_ERROR[4110] handled by the above*/
-			$this->_addKV(Vec\slice($key, 1), $value, inout $y); 
+			$this->_addKV(Vec\slice($key, 1), $keyToken, $value, inout $y); 
 			$dict[$x] = $y;
 		}
 	}
 
 
-	private function _appendKV(vec<string> $key, dict<string,nonnull> $value, inout dict<string,nonnull> $dict) : void { 
+	private function _appendKV(vec<string> $key, Token $keyToken, dict<string,nonnull> $value, inout dict<string,nonnull> $dict) : void { 
 		$count = \count($key);
 		if($count == 0) throw new LogicException("Empty key");
 
@@ -709,7 +741,7 @@ class parserBase extends parserContext implements parser_value {
 				return; 
 			}
 			/* HH_IGNORE_ERROR[4101] Generics */
-			else throw new TOMLException(NULL, \sprintf('Key error for "%s": %s is not a table', $this->keystr($key), $key[0]));
+			else throw new TOMLException($keyToken->getPosition(), \sprintf('"%s" is not an array of tables', $key[0]));
 		}
 
 		else {
@@ -719,25 +751,37 @@ class parserBase extends parserContext implements parser_value {
 			$y = idx($dict, $x, dict<string,nonnull>[]); 
 
 			/* HH_IGNORE_ERROR[4101] Generics */
-			if(!($y is dict)) throw new TOMLException(NULL, \sprintf('Key error for "%s": %s is not a table', $this->keystr($key), $x));
+			if(!($y is dict)) throw new TOMLException($keyToken->getPosition(), \sprintf('"%s": %s is not a table', $this->keystr($key), $x));
 			/* HH_IGNORE_ERROR[4110] handled by the above*/
-			$this->_appendKV(Vec\slice($key, 1), $value, inout $y); 
+			$this->_appendKV(Vec\slice($key, 1), $keyToken, $value, inout $y); 
 			$dict[$x] = $y;
 		}
 	}
 
-	public function addKeyValue(vec<string> $key, mixed $value) : void { 
+	public function addKeyValue(nonnull $value) : void { 
 		$dict = $this->dict; 
 		/* HH_IGNORE_ERROR[4110] for some reason, nonnull is incompatible with nonnull */
-		$this->_addKV($key, $value, inout $dict); 
+		if($key = $this->key) {
+			if($token = $this->keyToken) $this->_addKV($key, $token, $value, inout $dict); 
+		}
+		else throw new LogicException("Handling value without key");
+
 		/* HH_IGNORE_ERROR[4110] for some reason, nonnull is incompatible with nonnull */
-		$this->dict = $dict; 
+		$this->dict 	= $dict; 
+		$this->key 		= NULL;
+		$this->keyToken = NULL;
 	}
-	public function appendKeyValue(vec<string> $key, dict<string, nonnull> $value) : void 	{ 
+	public function appendKeyValue(dict<string, nonnull> $value) : void 	{ 
 		$dict = $this->dict; 
-		$this->_appendKV($key, $value, inout $dict); 
+		if($key = $this->key) {
+		 	if($token = $this->keyToken) $this->_appendKV($key, $token, $value, inout $dict); 
+		 }
+		else throw new LogicException("Handling value without key");
+
 		/* HH_IGNORE_ERROR[4110] for some reason, nonnull is incompatible with nonnull */
-		$this->dict = $dict;
+		$this->dict 	= $dict; 
+		$this->key 		= NULL;
+		$this->keyToken = NULL;
 	}
 
 	//
@@ -745,24 +789,25 @@ class parserBase extends parserContext implements parser_value {
 	//
 
 	protected ?vec<string> $key;
-	public function handleKey(vec<string> $key) : void { 
+	protected ?Token $keyToken;
+	public function handleKey(vec<string> $key, Token $token) : void { 
 
-		echo "KEY:\n";
+		\printf("KEY at %s:\n", positionString($token->getPosition()));
 		\print_r($key);// DEBUG
 		echo "\n";
 
 		if($this->key is nonnull) throw new LogicException("A key has been handled and not cleared"); 
 		$this->key = $key; 
+		$this->keyToken = $token;
 	}
+
+	public function getKey() : ?vec<string> { return $this->key; }
 
 	public function handleValue(Token $token, nonnull $value, valueType $type, ?valueType $subtype = NULL) : void { 
 		\printf("VALUE of type %s (%s): %s\n", Token::EnumToString((int) $type), $subtype == null ? 'none' : Token::EnumToString((int) $subtype), $value); // DEBUG
-		if($key = $this->key) { 
-			$this->addKeyValue($key, $value); 
-			$this->key = NULL; 
-			$this->expectLineEnd = TRUE; 
-		}
-		else throw new LogicException("Handling value with no key"); 
+
+		$this->addKeyValue($value); 
+		$this->expectLineEnd = TRUE; 
 	}
 
 	protected bool $expectEquals = FALSE; 
@@ -771,7 +816,7 @@ class parserBase extends parserContext implements parser_value {
 
 	// Helper function to deal with a potential key, returning TRUE if that works
 	// Sorry, bad function name lmao 
-	protected function doHandleKey(Token $token) : bool {
+	protected function doParseKey(Token $token) : bool {
 		if($token->isKey()) { 
 			$kp = new parserKey($this);
 			$kp->handleToken($token); 
@@ -817,7 +862,9 @@ class parserBase extends parserContext implements parser_value {
 		// No context - beginning of parse tree:
 		//
 
-		if($this->doHandleKey($token)) return; 
+		if($this->doParseKey($token)) return; 
+
+		if($this->key === NULL && $token->isEndAnchor()) return; // Ignore empty lines
 
 		else throw new TOMLUnexpectedException($token); 
 	}
@@ -910,7 +957,6 @@ class parserDictBody extends parserRoot {
 	}
 
 	private bool $opened = FALSE; 
-	private ?vec<string> $dictKey;
 
 	public function handleToken(Token $token) : void 
 	{
@@ -921,14 +967,12 @@ class parserDictBody extends parserRoot {
 		if($this->opened)
 		{
 			// End of the dictionary 
-			if($token->getType() == tokenType::OP_BRACKET_OPEN || $token->getType() == tokenType::EOF) { 
-				if($key = $this->dictKey) {
-					$this->pop(); 
-					$this->parent->addKeyValue($key, $this->dict); 
-					$this->parent->handleToken($token); 
-					return; 
-				}
-				else throw new LogicException("No key to add dict to");
+			if($token->getType() == tokenType::OP_BRACKET_OPEN || $token->getType() == tokenType::EOF) 
+			{
+				$this->pop(); 
+				$this->parent->addKeyValue($this->dict); 
+				$this->parent->handleToken($token); 
+				return; 
 			}
 
 			// Calling the parent implementation here, as opposed to passing control to the parent context instance
@@ -939,13 +983,13 @@ class parserDictBody extends parserRoot {
 			// Finishing up the declaration stage - coupled to the below 
 
 			if($this->key === NULL) { 
-				if($this->doHandleKey($token)) return; // The rest of the key handling will be done below on bracket close
+				if($this->doParseKey($token)) return; // The rest of the key handling will be done below on bracket close
 				else throw new TOMLException($token->getPosition(), "Expected a key in [dictionary] declaration"); 
 			}
 
 			if($token->getType() == tokenType::OP_BRACKET_CLOSE) {
 				if($key = $this->key) { 
-					$this->dictKey 	= $key;
+					$this->parent->handleKey($key, $token);
 					$this->key 		= NULL;
 					$this->opened 	= TRUE; 
 					return; 
@@ -967,7 +1011,6 @@ class parserDictArrayBody extends parserRoot {
 	}
 
 	private bool $opened = FALSE; 
-	private ?vec<string> $dictKey;
 
 	public function handleToken(Token $token) : void 
 	{
@@ -975,13 +1018,12 @@ class parserDictArrayBody extends parserRoot {
 		if($this->opened)
 		{
 			// End of the dictionary 
-			if($token->getType() == tokenType::OP_DB_BRACKET_OPEN || $token->getType() == tokenType::EOF) { 
-				if($key = $this->dictKey) {
-					$this->pop(); 
-					$this->parent->appendKeyValue($key, $this->dict); 
-					$this->parent->handleToken($token); 
-					return; 
-				} else throw new LogicException("No key to append dict array to");
+			if($token->getType() == tokenType::OP_DB_BRACKET_OPEN || $token->getType() == tokenType::EOF) 
+			{ 
+				$this->pop(); 
+				$this->parent->appendKeyValue($this->dict); 
+				$this->parent->handleToken($token); 
+				return;
 			}
 
 			else parent::handleToken($token); 
@@ -991,13 +1033,13 @@ class parserDictArrayBody extends parserRoot {
 			// Finishing up the declaration stage 
 
 			if($this->key === NULL) { 
-				if($this->doHandleKey($token)) return; 
+				if($this->doParseKey($token)) return; 
 				else throw new TOMLException($token->getPosition(), "Expected a key in [[dictionary array]] declaration"); 
 			}
 
 			if($token->getType() == tokenType::OP_DB_BRACKET_CLOSE) {
 				if($key = $this->key) { 
-					$this->dictKey 	= $key;
+					$this->parent->handleKey($key, $token);
 					$this->key 		= NULL;
 					$this->opened 	= TRUE;
 					return; 
@@ -1070,10 +1112,12 @@ class Decoder {
 
 			if($char == "\n") { 
 				$this->lineNum++; 
-				if($lexer = $this->lexer) $lexer->handleLine($this->line, $this->lineNum); 
+				if($lexer = $this->lexer) {
+					$lexer->handleLine($this->line, $this->lineNum); 
+					$lexer->EOL();
+				} 
 				else throw new LogicException("NO LEXER SET");
 
-				$this->handleToken(new Token(tokenType::EOL, $this->lineNum, $i));
 				$this->line = '';
 			}
 			else $this->line .= $char; 
@@ -1094,11 +1138,16 @@ class Decoder {
 		}
 
 		if($lexer = $this->lexer) 
-			{ if(!\ctype_space($this->line)) $lexer->handleLine($this->line, $this->lineNum); }
+		{ 
+			if(!\ctype_space($this->line)) $lexer->handleLine($this->line, $this->lineNum); 
+			$lexer->EOF();
+		}
 		else throw new LogicException("NO LEXER SET"); 
-		$this->handleToken(new Token(tokenType::EOF, $this->lineNum, 0));
+		
 
-		return $this->parsers[0]->getDict();
+		// assuming first parser is parserRoot, which it should always be 
+		$root = ($this->parsers)[0] as parserRoot;
+		return $root->getDict();
 	}
 
 	//TODO: Decode string 
