@@ -139,24 +139,24 @@ class Token {
 		if($type = $this->getValueType()) {
 			switch($type) {
 
-				case tokenType::INTEGER: 		
+				case valueType::INTEGER: 		
 					$text =	Str\replace($this->text, '_', ''); 		// Idk if PHP handles underscores, docs are shit 
 					$text = Str\replace($this->text, '0o', '0'); 	// Since the validity was guaranteed earlier, the only 0o could be at the beginning
 																	// intval() uses a leading 0 to mean it's octal 
 
 					return \intval($text);
 
-				case tokenType::FLOAT: 			
+				case valueType::FLOAT: 			
 					$text =	Str\replace($this->text, '_', ''); 		
 					return \doubleval($text);
 
-				case tokenType::BOOL:
+				case valueType::BOOL:
 					if($this->text === "true") return TRUE;
 					else return FALSE;
 
 
-				case tokenType::STRING: 		return $this->text;
-				case tokenType::DATETIME:		return new \DateTime($this->text);
+				case valueType::STRING: 		return $this->text;
+				case valueType::DATETIME:		return new \DateTime($this->text);
 
 				default:						throw new LogicException("Type not handled in value()");
 			}
@@ -229,7 +229,7 @@ class Lexer {
 
 	public final function EOL() : void { 
 		if($handler = $this->StringHandler) if($handler->isMultiline()) return; 
-		$this->parent->handleToken(new Token(tokenType::EOF, $this->line, 0));
+		$this->parent->handleToken(new Token(tokenType::EOL, $this->line, 0));
 	}
 
 	public final function EOF() : void { 
@@ -629,7 +629,8 @@ class parserValue extends parserContext implements parser_value {
 	}
 
 	public function handleValue(Token $token, nonnull $value, valueType $type, ?valueType $subtype = NULL) : void { 
-		if($this->parent !== $this) $this->decoder->parserPop();
+		if($this->parent !== $this) $this->decoder->parserPop(); // keeps root from popping itself
+		if($this->parent is parserDictBody) print("ASDF\n");// DEBUG
 		$this->parent->handleValue($token, $value, $type, $subtype); 
 	}
 }
@@ -703,7 +704,7 @@ class parserBase extends parserContext implements parser_value {
 		return $str; 
 	}
 
-	private function _addKV(vec<string> $key, Token $keyToken, nonnull $value, inout dict<string,mixed> $dict) : void { 
+	private function _addKV(vec<string> $key, Token $keyToken, nonnull $value, inout dict<string,nonnull> $dict) : void { 
 		$count = \count($key);
 		if($count == 0) throw new LogicException("Empty key");
 
@@ -760,13 +761,11 @@ class parserBase extends parserContext implements parser_value {
 
 	public function addKeyValue(nonnull $value) : void { 
 		$dict = $this->dict; 
-		/* HH_IGNORE_ERROR[4110] for some reason, nonnull is incompatible with nonnull */
 		if($key = $this->key) {
 			if($token = $this->keyToken) $this->_addKV($key, $token, $value, inout $dict); 
 		}
 		else throw new LogicException("Handling value without key");
 
-		/* HH_IGNORE_ERROR[4110] for some reason, nonnull is incompatible with nonnull */
 		$this->dict 	= $dict; 
 		$this->key 		= NULL;
 		$this->keyToken = NULL;
@@ -778,7 +777,6 @@ class parserBase extends parserContext implements parser_value {
 		 }
 		else throw new LogicException("Handling value without key");
 
-		/* HH_IGNORE_ERROR[4110] for some reason, nonnull is incompatible with nonnull */
 		$this->dict 	= $dict; 
 		$this->key 		= NULL;
 		$this->keyToken = NULL;
@@ -964,6 +962,8 @@ class parserDictBody extends parserRoot {
 		// 1) Handling the declaration stage, when $this->opened is FALSE 
 		// 2) Handling the end of this dictionary, at which point control should pass to the next context in the stack
 
+		\printf("DICT BODY TOKEN: %s\n", $token->getText()); 
+
 		if($this->opened)
 		{
 			// End of the dictionary 
@@ -992,6 +992,7 @@ class parserDictBody extends parserRoot {
 					$this->parent->handleKey($key, $token);
 					$this->key 		= NULL;
 					$this->opened 	= TRUE; 
+					\printf("Opened dict: %s\n", $key[\count($key) - 1]); // DEBUG
 					return; 
 				}
 				else throw new TOMLException($token->getPosition(), "Expected a key in [dictionary] declaration"); 
@@ -1094,8 +1095,14 @@ class Decoder {
 		else throw new LogicException("No parsers on the stack"); 
 	}
 
-	public function parserPush(parserContext $parser) : void { $this->parsers->add($parser); }
-	public function parserPop() : void { $this->parsers->pop(); }
+	public function parserPush(parserContext $parser) : void { 
+		\printf("PUSH\n"); // DEBUG
+		$this->parsers->add($parser); 
+	}
+	public function parserPop() : void { 
+		\printf("POP\n"); // DEBUG
+		$this->parsers->pop(); 
+	}
 
 
 	private int $lineNum = 1;

@@ -25,11 +25,6 @@ function main() : noreturn {
 		echo $e->getTraceAsString()."\n";
 	}
 
-	echo "\n -- Tokens -- \n";
-
-	$tokens = $Decoder->getTokens(); 
-	foreach($tokens as $token) { printf("%s\n", $token->toString()); }
-
 	exit(0);
 
 }
