@@ -948,18 +948,18 @@ class parserInlineDict extends parserBase {
 
 	public function handleToken(Token $token) : void {
 
+		if($token->getType() == tokenType::OP_BRACE_CLOSE) { 
+			$this->decoder->parserPop();
+			$this->parent->handleValue($this->init, $this->dict, valueType::INLINE_DICT); 
+			return; 
+		}
+		
 		if($this->expectLineEnd) {
 			if($token->getType() == tokenType::OP_COMMA) { 
 				$this->expectLineEnd = FALSE; 
 				return; 
 			}
 			else throw new TOMLException($token->getPosition(), "Expected comma (,) to separate entries in inline table"); 
-		}
-
-		if($token->getType() == tokenType::OP_BRACE_CLOSE) { 
-			$this->decoder->parserPop();
-			$this->parent->handleValue($this->init, $this->dict, valueType::INLINE_DICT); 
-			return; 
 		}
 
 		parent::handleToken($token); 
