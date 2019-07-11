@@ -107,6 +107,10 @@ class Token {
 			case tokenType::EOF: 		return "end-of-file";
 			case tokenType::COMMENT: 	return "Comment";
 
+			case tokenType::OP_COMMA: 	return "comma (,)";
+			case tokenType::OP_EQUALS:	return "equals sign (=)";
+			case tokenType::OP_DOT: 	return "dot (.)";
+
 			case valueType::INLINE_DICT:return "Inline table";
 			case valueType::ARRAY: 		return "Array";
 			case valueType::EMPTY: 		return "Empty";
@@ -521,19 +525,6 @@ class StringHandler {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 abstract class parserContext 
 {
 
@@ -554,123 +545,7 @@ interface parser_value {
 }
 
 
-//
-// Phrase parsing
-//
 
-
-/**
- * Parses a key, then invokes the handleKey() method of its parent parserBase and pops itself off.  
- * Should always be on top of parserRoot or parserDict 
- */
-class parserKey extends parserContext { 
-
-	private parserBase $parent; 
-	private vec<string> $keys = vec<string>[]; 
-
-	public function __construct(parserBase $parent) { 
-		$this->parent = $parent; 
-		parent::__construct($parent->decoder);
-	}
-
-	private bool $expectKey = TRUE; 
-
-	public function handleToken(Token $token) : void 
-	{ 
-		\printf("Key token %s\n", $token->getText()); // DEBUG
-
-		if($this->expectKey) 
-		{ 
-			if($token->isKey()) { 
-				$this->keys[] = $token->getText(); 
-				$this->expectKey = FALSE;
-			}
-			else throw new TOMLException($token->getPosition(), "Expected a key following the dot (.)"); 
-		}
-
-		else if($token->getType() == tokenType::OP_DOT) { 
-			$this->expectKey = TRUE;
-			return; 
-		}
-
-		else { 
-			$this->pop();
-			$this->parent->handleKey($this->keys, $token); 
-			$this->parent->handleToken($token); 
-		}
-	}
-}
-
-class parserValue extends parserContext implements parser_value { 
-	private parser_value $parent;
-
-	public function __construct(parser_value $parent) { 
-		$this->parent = $parent; 
-		parent::__construct($parent->decoder);
-	}
-
-	public function handleToken(Token $token) : void { 
-		if($type = $token->getValueType()) { 
-			$this->decoder->parserPop();
-			$this->parent->handleValue($token, $token->getValue(), $type);
-			return; 
-		}
-
-		else if($token->getType() == tokenType::OP_BRACE_OPEN) { 
-			$this->decoder->parserPush(new parserInlineDict($this, $token));
-			return;
-		}
-
-		else if($token->getType() == tokenType::OP_BRACKET_OPEN) { 
-			$this->decoder->parserPush(new parserArray($this, $token)); 
-		}
-
-		else throw new TOMLException($token->getPosition(), "Expected a value type here, got ".Token::EnumToString((int) $token->getType())); 
-	}
-
-	public function handleValue(Token $token, nonnull $value, valueType $type, ?valueType $subtype = NULL) : void { 
-		if($this->parent !== $this) $this->decoder->parserPop(); // keeps root from popping itself
-		if($this->parent is parserDictBody) print("ASDF\n");// DEBUG
-		$this->parent->handleValue($token, $value, $type, $subtype); 
-	}
-}
-
-
-class parserArray extends parserContext implements parser_value { 
-	private parserValue $parent; 
-	private vec<nonnull> $vec = vec<nonnull>[]; 
-	private ?valueType $subtype; 
-	private Token $init; 
-
-	public function __construct(parserValue $parent, Token $init) { 
-		$this->parent = $parent; 
-		$this->init = $init; 
-		parent::__construct($parent->decoder);
-
-		$this->decoder->parserPush(new parserValue($this)); 
-	}
-
-	public function handleToken(Token $token) : void {
-		if($token->isEndAnchor()) return; // Ignore newlines in array 
-
-		if($token->getType() == tokenType::OP_COMMA) { 
-			$this->decoder->parserPush(new parserValue($this)); 
-			return; 
-		}
-
-		$this->decoder->parserPop();
-		$this->parent->handleValue($this->init, $this->vec, valueType::ARRAY, $this->subtype ?? valueType::EMPTY); 
-	}
-
-
-	public function handleValue(Token $token, nonnull $value, valueType $type, ?valueType $subtype = NULL) : void { 
-
-		if($this->subtype != NULL && $type!= $this->subtype) throw new TOMLException($token->getPosition(), \sprintf('Member of type %s in array previously of type %s', Token::EnumToString((int) $type) ?? '-', Token::EnumToString((int) $type) ?? '-'));
-		else $this->subtype = $type; 
-		
-		$this->vec[] = $value; 
-	}
-}
 
 
 
@@ -802,7 +677,10 @@ class parserBase extends parserContext implements parser_value {
 	public function getKey() : ?vec<string> { return $this->key; }
 
 	public function handleValue(Token $token, nonnull $value, valueType $type, ?valueType $subtype = NULL) : void { 
-		\printf("VALUE of type %s (%s): %s\n", Token::EnumToString((int) $type), $subtype == null ? 'none' : Token::EnumToString((int) $subtype), $value); // DEBUG
+		$valuestr = $value;
+		/* HH_IGNORE_ERROR[4101] Generic argument */
+		if($value is vec || $value is dict) $valuestr = "--";
+		\printf("VALUE of type %s (%s): %s\n", Token::EnumToString((int) $type), $subtype == null ? 'none' : Token::EnumToString((int) $subtype), $valuestr); // DEBUG
 
 		$this->addKeyValue($value); 
 		$this->expectLineEnd = TRUE; 
@@ -901,6 +779,159 @@ class parserRoot extends parserBase {
 	}
 }
 
+
+
+
+//
+//
+// Phrase parsing
+//
+//
+
+
+//
+// Key-Value
+//
+
+
+
+/**
+ * Parses a key, then invokes the handleKey() method of its parent parserBase and pops itself off.  
+ * Should always be on top of parserRoot or parserDict 
+ */
+class parserKey extends parserContext { 
+
+	private parserBase $parent; 
+	private vec<string> $keys = vec<string>[]; 
+
+	public function __construct(parserBase $parent) { 
+		$this->parent = $parent; 
+		parent::__construct($parent->decoder);
+	}
+
+	private bool $expectKey = TRUE; 
+
+	public function handleToken(Token $token) : void 
+	{ 
+		\printf("Key token %s\n", $token->getText()); // DEBUG
+
+		if($this->expectKey) 
+		{ 
+			if($token->isKey()) { 
+				$this->keys[] = $token->getText(); 
+				$this->expectKey = FALSE;
+			}
+			else throw new TOMLException($token->getPosition(), "Expected a key following the dot (.)"); 
+		}
+
+		else if($token->getType() == tokenType::OP_DOT) { 
+			$this->expectKey = TRUE;
+			return; 
+		}
+
+		else { 
+			$this->pop();
+			$this->parent->handleKey($this->keys, $token); 
+			$this->parent->handleToken($token); 
+		}
+	}
+}
+
+class parserValue extends parserContext implements parser_value { 
+	private parser_value $parent;
+
+	public function __construct(parser_value $parent) { 
+		$this->parent = $parent; 
+		parent::__construct($parent->decoder);
+	}
+
+	public function handleToken(Token $token) : void { 
+		if($type = $token->getValueType()) { 
+			$this->decoder->parserPop();
+			$this->parent->handleValue($token, $token->getValue(), $type);
+			return; 
+		}
+
+		else if($token->getType() == tokenType::OP_BRACE_OPEN) { 
+			$this->decoder->parserPush(new parserInlineDict($this, $token));
+			return;
+		}
+
+		else if($token->getType() == tokenType::OP_BRACKET_OPEN) { 
+			$this->decoder->parserPush(new parserArray($this, $token)); 
+		}
+
+		else throw new TOMLException($token->getPosition(), "Expected a value type here, got ".Token::EnumToString((int) $token->getType())); 
+	}
+
+	public function handleValue(Token $token, nonnull $value, valueType $type, ?valueType $subtype = NULL) : void { 
+		if($this->parent !== $this) $this->decoder->parserPop(); // keeps root from popping itself
+		$this->parent->handleValue($token, $value, $type, $subtype); 
+	}
+}
+
+
+
+//
+// Complex value types
+//
+
+
+
+class parserArray extends parserContext implements parser_value { 
+	private parserValue $parent; 
+	private vec<nonnull> $vec = vec<nonnull>[]; 
+	private ?valueType $subtype; 
+	private Token $init; 
+
+	private bool $expectValue = TRUE; 
+
+	public function __construct(parserValue $parent, Token $init) { 
+		$this->parent = $parent; 
+		$this->init = $init; 
+		parent::__construct($parent->decoder);
+	}
+
+	public function handleToken(Token $token) : void {
+		if($token->getType() == tokenType::EOL) return; // Ignore newlines in array
+		if($token->getType() == tokenType::EOF) throw new TOMLUnexpectedException($token); // Incomplete array
+
+		if($token->getType() == tokenType::OP_BRACKET_CLOSE) {
+			$this->decoder->parserPop();
+			$this->parent->handleValue($this->init, $this->vec, valueType::ARRAY, $this->subtype ?? valueType::EMPTY); 
+			return;
+		}
+
+		if($this->expectValue) { 
+			$parser = new parserValue($this); 
+			$this->decoder->parserPush($parser); 
+			$parser->handleToken($token); 
+			return; 
+		}
+		else if($token->getType() == tokenType::OP_COMMA) { 
+			$this->expectValue = TRUE; 
+			return; 
+		}
+		else throw new TOMLUnexpectedException($token);
+	}
+
+
+	public function handleValue(Token $token, nonnull $value, valueType $type, ?valueType $subtype = NULL) : void { 
+
+		if($this->subtype != NULL && $type!= $this->subtype) throw new TOMLException($token->getPosition(), \sprintf('Member of type %s in array previously of type %s', 
+			Token::EnumToString((int) $type) ?? '-', 
+			Token::EnumToString((int) $this->subtype) ?? '-'));
+		else $this->subtype = $type; 
+		
+		$this->vec[] = $value; 
+		$this->expectValue = FALSE; 
+	}
+}
+
+
+
+
+
 //
 // An override of the parser that expects commas instead of line ends
 //
@@ -936,11 +967,17 @@ class parserInlineDict extends parserBase {
 }
 
 
+
+
+
 //
 //
 // Section parsing
 //
 //
+
+
+
 
 
 /**
