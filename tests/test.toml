@@ -1,3 +1,10 @@
-dude = "guy"
-test = { dict = 1, cock = 45 }
-bro = 12.2
+int1 = +99
+int2 = 42
+int3 = 0
+int4 = -17
+
+# For large numbers, you may use underscores between digits to enhance readability. Each underscore must be surrounded by at least one digit on each side.
+
+int5 = 1_000
+int6 = 5_349_221
+int7 = 1_2_3_4_5 

@@ -105,7 +105,7 @@ class Token {
 
 			case tokenType::EOL: 		return "end-of-line";
 			case tokenType::EOF: 		return "end-of-file";
-			case tokenType::COMMENT: 	return "Comment";
+			case tokenType::COMMENT: 	return "comment";
 
 			case tokenType::OP_COMMA: 	return "comma (,)";
 			case tokenType::OP_EQUALS:	return "equals sign (=)";
@@ -143,9 +143,10 @@ class Token {
 		if($type = $this->getValueType()) {
 			switch($type) {
 
-				case valueType::INTEGER: 		
-					$text =	Str\replace($this->text, '_', ''); 		// Idk if PHP handles underscores, docs are shit 
-					$text = Str\replace($this->text, '0o', '0'); 	// Since the validity was guaranteed earlier, the only 0o could be at the beginning
+				case valueType::INTEGER: 
+					$text = $this->text;		
+					$text =	Str\replace($text, '_', ''); 		// Idk if PHP handles underscores, docs are shit 
+					$text = Str\replace($text, '0o', '0'); 	// Since the validity was guaranteed earlier, the only 0o could be at the beginning
 																	// intval() uses a leading 0 to mean it's octal 
 
 					return \intval($text);
@@ -273,7 +274,7 @@ class Lexer {
 
 			if(\ctype_space($line[$n])){ $this->n++; continue; }
 
-			if($line[$n] == "#") { $this->token(tokenType::COMMENT, '#'); return;  }
+			if($line[$n] == "#") return; // Ignore rest of line starting at comment
 
 
 			//
@@ -893,8 +894,8 @@ class parserArray extends parserContext implements parser_value {
 	}
 
 	public function handleToken(Token $token) : void {
-		if($token->getType() == tokenType::EOL) return; // Ignore newlines in array
 		if($token->getType() == tokenType::EOF) throw new TOMLUnexpectedException($token); // Incomplete array
+		if($token->getType() == tokenType::EOL) return; // Ignore newlines in array
 
 		if($token->getType() == tokenType::OP_BRACKET_CLOSE) {
 			$this->decoder->parserPop();
@@ -953,7 +954,7 @@ class parserInlineDict extends parserBase {
 			$this->parent->handleValue($this->init, $this->dict, valueType::INLINE_DICT); 
 			return; 
 		}
-		
+
 		if($this->expectLineEnd) {
 			if($token->getType() == tokenType::OP_COMMA) { 
 				$this->expectLineEnd = FALSE; 
@@ -997,13 +998,13 @@ class parserDictBody extends parserRoot {
 	{
 		// Gotta override this in two ways:
 		// 1) Handling the declaration stage, when $this->opened is FALSE 
-		// 2) Handling the end of this dictionary, at which point control should pass to the next context in the stack
+		// 2) Handling the end of this table, at which point control should pass to the next context in the stack
 
 		\printf("DICT BODY TOKEN: %s\n", $token->getText()); 
 
 		if($this->opened)
 		{
-			// End of the dictionary 
+			// End of the table 
 			if($token->getType() == tokenType::OP_BRACKET_OPEN || $token->getType() == tokenType::EOF) 
 			{
 				$this->pop(); 
@@ -1021,7 +1022,7 @@ class parserDictBody extends parserRoot {
 
 			if($this->key === NULL) { 
 				if($this->doParseKey($token)) return; // The rest of the key handling will be done below on bracket close
-				else throw new TOMLException($token->getPosition(), "Expected a key in [dictionary] declaration"); 
+				else throw new TOMLException($token->getPosition(), "Expected a key in [table] declaration"); 
 			}
 
 			if($token->getType() == tokenType::OP_BRACKET_CLOSE) {
@@ -1032,7 +1033,7 @@ class parserDictBody extends parserRoot {
 					\printf("Opened dict: %s\n", $key[\count($key) - 1]); // DEBUG
 					return; 
 				}
-				else throw new TOMLException($token->getPosition(), "Expected a key in [dictionary] declaration"); 
+				else throw new TOMLException($token->getPosition(), "Expected a key name in [table] declaration"); 
 			}
 			else throw new TOMLUnexpectedException($token); 
 
@@ -1126,6 +1127,7 @@ class Decoder {
 	public function getTokens() : vec<Token> { return $this->tokens; }
 
 	public function handleToken(Token $token) : void { 
+
 		if($p = $this->parsers->lastValue()) { 
 			$p->handleToken($token); 
 		}
