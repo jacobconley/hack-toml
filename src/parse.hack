@@ -609,6 +609,14 @@ class parserBase extends parserContext implements parser_value {
 		return $str; 
 	}
 
+	//TODO:  An is-key-defined map to keep track of keys that have not been directly defined but are still part of the dict structure
+	// It should be an object of the parser root that remains static, or else how would it handle nested contexts like tables?
+	// It needs to be only in addKV and not appendKV because of the nature of array-of-tables,
+	//  but then addKV needs to have a conditional to merge tables that already exist but have not been directly defined
+	//
+	// I think a separate nested dict would do the trick, mapping key: string => (defined: BOOL, children: ?dict<string>)
+	// That way a key can have children without being directly defined
+
 	private function _addKV(vec<string> $key, Token $keyToken, nonnull $value, inout dict<string,nonnull> $dict) : void { 
 		$count = \count($key);
 		if($count == 0) throw new LogicException("Empty key");
