@@ -617,6 +617,8 @@ class parserBase extends parserContext implements parser_value {
 	// I think a separate nested dict would do the trick, mapping key: string => (defined: BOOL, children: ?dict<string>)
 	// That way a key can have children without being directly defined
 
+	//TODO: also: A key may sometimes be parsed as a float, causing invalid dotting - we need to handle that in KeyParser
+
 	private function _addKV(vec<string> $key, Token $keyToken, nonnull $value, inout dict<string,nonnull> $dict) : void { 
 		$count = \count($key);
 		if($count == 0) throw new LogicException("Empty key");
