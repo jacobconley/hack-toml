@@ -1,24 +1,7 @@
-# fractional
-flt1 = +1.0
-flt2 = 3.1415
-flt3 = -0.01
+ldt1 = 1979-05-27T07:32:00
+ldt2 = 1979-05-27T00:32:00.999999
 
-# exponent
-flt4 = 5e+22
-flt5 = 1e6
-flt6 = -2E-2
+ld1 = 1979-05-27
 
-# both
-flt7 = 6.626e-34
-
-flt8 = 224_617.445_991_228
-
-# infinity
-sf1 = inf  # positive infinity
-sf2 = +inf # positive infinity
-sf3 = -inf # negative infinity
-
-# not a number
-sf4 = nan  # actual sNaN/qNaN encoding is implementation specific
-sf5 = +nan # same as `nan`
-sf6 = -nan # valid, actual encoding is implementation specific
+lt1 = 07:32:00
+lt2 = 00:32:00.999999

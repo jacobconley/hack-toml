@@ -369,7 +369,11 @@ class Lexer {
 			if($match = $this->is('false')) { $this->token(tokenType::BOOL, $match); 	continue; }
 
 			// Datetime 
-			if($match = Regex\first_match($this->lineText, re"/^\d{4}-\d\d-\d\d(T| )\d\d:\d\d:\d\d(\.\d+)?(Z|((\+|-)\d\d:\d\d))?/")) { 
+			if($match = Regex\first_match($this->lineText, re"/^\d{4}-\d\d-\d\d((T| )\d\d:\d\d:\d\d(\.\d+)?)?(Z|((\+|-)\d\d:\d\d))?/")) { 
+				$this->token(tokenType::DATETIME, $match[0]); 	
+				continue; 
+			}
+			if($match = Regex\first_match($this->lineText, re"/^\d\d:\d\d:\d\d(\.\d+)?/")) { 
 				$this->token(tokenType::DATETIME, $match[0]); 	
 				continue; 
 			}
@@ -706,7 +710,10 @@ class parserBase extends parserContext implements parser_value {
 		$valuestr = $value;
 		/* HH_IGNORE_ERROR[4101] Generic argument */
 		if($value is vec || $value is dict) $valuestr = "--";
-		\printf("VALUE of type %s (%s): %s\n", Token::EnumToString((int) $type), $subtype == null ? 'none' : Token::EnumToString((int) $subtype), $valuestr); // DEBUG
+		if($value is \DateTime) $valuestr = "DateTime";
+		\printf("VALUE of type %s (%s): %s\n", 	Token::EnumToString((int) $type), 
+												$subtype == null ? 'none' : Token::EnumToString((int) $subtype), 
+												$valuestr); // DEBUG
 
 		$this->addKeyValue($value); 
 		$this->expectLineEnd = TRUE; 
