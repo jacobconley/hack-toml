@@ -141,18 +141,40 @@ class Token {
 
 	public function getValue() : nonnull { 
 		if($type = $this->getValueType()) {
+
+			// Special float values override before going into the main script;
+			if($type == valueType::FLOAT) { 				
+				switch($this->text) { 
+					case "inf":
+					case "+inf":
+						return (float) INF;
+
+					case "-inf":
+						return (float) -INF;
+
+					case "nan":
+					case "+nan":
+					case "-nan":
+						return (float) NAN;
+
+					default: break; 
+				}
+			}
+
+
 			switch($type) {
 
 				case valueType::INTEGER: 
 					$text = $this->text;		
 					$text =	Str\replace($text, '_', ''); 		// Idk if PHP handles underscores, docs are shit 
-					$text = Str\replace($text, '0o', '0'); 	// Since the validity was guaranteed earlier, the only 0o could be at the beginning
-																	// intval() uses a leading 0 to mean it's octal 
+					$text = Str\replace($text, '0o', '0'); 		// Since the validity was guaranteed earlier, the only 0o could be at the beginning
+																// intval() uses a leading 0 to mean it's octal 
 
 					return \intval($text);
 
-				case valueType::FLOAT: 			
-					$text =	Str\replace($this->text, '_', ''); 		
+				case valueType::FLOAT: 	
+					$text = $this->text;
+					$text =	Str\replace($text, '_', ''); 		
 					return \doubleval($text);
 
 				case valueType::BOOL:
@@ -183,7 +205,7 @@ class Token {
 class Lexer { 
 
 	protected Decoder $parent;
-	protected int $line = 1; 
+	protected int $lineNum = 1; 
 
 	public function __construct(Decoder $parent) { 
 		$this->parent = $parent;
@@ -194,13 +216,13 @@ class Lexer {
 	// Helper functions
 	//
 
-	protected final function getPosition() : position { return tuple($this->line, $this->n + 1); }
-	public final function getLineNum() : int { return $this->parent->getLineNum(); }
+	protected final function getPosition() : position { return tuple($this->lineNum, $this->n + 1); }
+	public final function getLineNum() : int { return $this->lineNum; }
 	public final function getParent() : Decoder { return $this->parent; }
 
 	private function token(tokenType $type, string $value) : void {
 		\printf("\n\nTOKEN: %s '%s'\n", Token::EnumToString((int) $type), $value); // DEBUG
-		$this->parent->handleToken(new Token($type, $this->line, $this->n, $value));  
+		$this->parent->handleToken(new Token($type, $this->lineNum, $this->n, $value));  
 		$this->n += Str\length($value); 
 	}
 
@@ -234,12 +256,12 @@ class Lexer {
 
 	public final function EOL() : void { 
 		if($handler = $this->StringHandler) if($handler->isMultiline()) return; 
-		$this->parent->handleToken(new Token(tokenType::EOL, $this->line, 0));
+		$this->parent->handleToken(new Token(tokenType::EOL, $this->lineNum, 0));
 	}
 
 	public final function EOF() : void { 
 		if($this->StringHandler) throw new TOMLException(NULL, "Unexpected end-of-file in string literal");
-		$this->parent->handleToken(new Token(tokenType::EOF, $this->line, 0));
+		$this->parent->handleToken(new Token(tokenType::EOF, $this->lineNum, 0));
 	}
 
 
@@ -250,7 +272,7 @@ class Lexer {
 	public final function handleLine(string $line, int $lineNum, int $offset = 0) : void { 
 		\printf("\n\n---------------\nLINE: %s\n", $line); // DEBUG
 
-		$this->line 	= $lineNum; 
+		$this->lineNum 	= $lineNum; 
 		// $this->lineText = $line; 
 		$this->n 		= $offset; 
 
@@ -354,8 +376,11 @@ class Lexer {
 
 			// Number
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
-			if($match = Regex\first_match($this->lineText, re"/^0x[0-9a-f_]+|^0o[0-7_]|^0b[01_]|^[\+-]?(inf|nan|(0|[1-9]([0-9_])*(\.[0-9_]+)?)([eE][\+-]?[0-9_]+)?)/")) { 
-				if(!(Str\is_empty($match[4]) && Str\is_empty($match[5])) || Str\starts_with($match[0], '0')) 	$this->token(tokenType::FLOAT, $match[0]); 
+			if($match = Regex\first_match($this->lineText, re"/^0x[0-9a-f_]+|^0o[0-7_]|^0b[01_]|^[\+-]?((inf|nan)|[0-9_]+(\.[0-9_]+)?([eE][\+-]?[0-9_]+)?)/")) 
+			{ 				
+				if($match[0][0] === '0' && Str\slice($match[0], 0, 2) !== '0o') throw new TOMLException($this->getPosition(), "Leading zeros are not allowed");
+
+				if(!(Str\is_empty($match[2]) && Str\is_empty($match[3]) && Str\is_empty($match[4]))) 			$this->token(tokenType::FLOAT, $match[0]); 
 				else 																							$this->token(tokenType::INTEGER, $match[0]); 
 
 				continue; 
@@ -1144,7 +1169,7 @@ class Decoder {
 	}
 
 
-	private int $lineNum = 1;
+	private int $lineNum = 0;
 	public function getLineNum() : int { return $this->lineNum; }
 
 	private string $line = "";
