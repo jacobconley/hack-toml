@@ -8,9 +8,12 @@ function main() : noreturn {
 	$Decoder = new Decoder();
 
 	try { 
+		$time = \microtime(TRUE);
 		$result = $Decoder->DecodeFile(__DIR__.'/test.toml');
 
-		echo "\n -- Result -- \n";
+		echo "$time\n";
+		\printf("Done in %d ms\n", \microtime(TRUE) - $time);
+		echo " -- Result -- \n";
 		print_r($result); 
 	}
 	catch (TOMLException $e) {

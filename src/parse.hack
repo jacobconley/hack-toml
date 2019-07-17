@@ -221,7 +221,6 @@ class Lexer {
 	public final function getParent() : Decoder { return $this->parent; }
 
 	private function token(tokenType $type, string $value) : void {
-		\printf("\n\nTOKEN: %s '%s'\n", Token::EnumToString((int) $type), $value); // DEBUG
 		$this->parent->handleToken(new Token($type, $this->lineNum, $this->n, $value));  
 		$this->n += Str\length($value); 
 	}
@@ -270,7 +269,6 @@ class Lexer {
 	 * Process the current character $char.  Return $this to keep current frame, nonnull to replace, null to pop 
 	 */
 	public final function handleLine(string $line, int $lineNum, int $offset = 0) : void { 
-		\printf("\n\n---------------\nLINE: %s\n", $line); // DEBUG
 
 		$this->lineNum 	= $lineNum; 
 		// $this->lineText = $line; 
@@ -279,7 +277,6 @@ class Lexer {
 		while($this->n < \strlen($line)) { 
 			$n = $this->n; 
 			$this->lineText = Str\slice($line, $n); 
-			// \printf("AT %d - '%s'\n", $n, $this->lineText); // DEBUG
 
 			// First - see if there is a string context
 			// If there is, it will return a new $n offset to skip to if it finishes, or NULL which means it continues into the next line as well
@@ -437,11 +434,7 @@ class StringHandler {
 	// Returns NULL if string is still going, or offset if it ends
 	
 	public final function handleLine(string $line, int $lineNum, int $offset) : ?int
-	{ 
-
-		\printf("STRING LINE at %d: %s\n", $offset, $line); 
-
-
+	{
 		// Newline immediately following opening multiline delim, ignored and continued 
 		if($this->multiline && !($this->opened) && Str\is_empty($line)) { $this->opened = TRUE; return NULL; }
 		$this->opened = TRUE; 
@@ -518,8 +511,6 @@ class StringHandler {
 					}
 				}
 
-
-				\printf("\nSTRING: '''%s'''\n", $this->value); // DEBUG
 
 				$this->parent->getParent()->handleToken(new Token(
 					$this->multiline ? tokenType::STRING_M : tokenType::STRING,
@@ -715,12 +706,8 @@ class parserBase extends parserContext implements parser_value {
 
 	protected ?vec<string> $key;
 	protected ?Token $keyToken;
-	public function handleKey(vec<string> $key, Token $token) : void { 
-
-		\printf("KEY at %s:\n", positionString($token->getPosition()));
-		\print_r($key);// DEBUG
-		echo "\n";
-
+	public function handleKey(vec<string> $key, Token $token) : void 
+	{ 
 		if($this->key is nonnull) throw new LogicException("A key has been handled and not cleared"); 
 		$this->key = $key; 
 		$this->keyToken = $token;
@@ -729,14 +716,6 @@ class parserBase extends parserContext implements parser_value {
 	public function getKey() : ?vec<string> { return $this->key; }
 
 	public function handleValue(Token $token, nonnull $value, valueType $type, ?valueType $subtype = NULL) : void { 
-		$valuestr = $value;
-		/* HH_IGNORE_ERROR[4101] Generic argument */
-		if($value is vec || $value is dict) $valuestr = "--";
-		if($value is \DateTime) $valuestr = "DateTime";
-		\printf("VALUE of type %s (%s): %s\n", 	Token::EnumToString((int) $type), 
-												$subtype == null ? 'none' : Token::EnumToString((int) $subtype), 
-												$valuestr); // DEBUG
-
 		$this->addKeyValue($value); 
 		$this->expectLineEnd = TRUE; 
 	}
@@ -949,8 +928,6 @@ class parserKey extends parserContext {
 
 	public function handleToken(Token $token) : void 
 	{ 
-		\printf("Key token %s\n", $token->getText()); // DEBUG
-
 		if($this->expectKey) 
 		{ 
 			if($token->isKey()) { 
@@ -1138,9 +1115,7 @@ class parserDictBody extends parserRoot {
 	{
 		// Gotta override this in two ways:
 		// 1) Handling the declaration stage, when $this->opened is FALSE 
-		// 2) Handling the end of this table, at which point control should pass to the next context in the stack
-
-		\printf("DICT BODY TOKEN: %s\n", $token->getText()); 
+		// 2) Handling the end of this table, at which point control should pass to the next context in the stack 
 
 		if($this->opened)
 		{
@@ -1171,7 +1146,6 @@ class parserDictBody extends parserRoot {
 					$this->key 		= NULL;
 					$this->opened 	= TRUE; 
 					$this->expectLineEnd = TRUE;
-					\printf("Opened dict: %s\n", $key[\count($key) - 1]); // DEBUG
 					return; 
 				}
 				else throw new TOMLException($token->getPosition(), "Expected a key name in [table] declaration"); 
@@ -1267,11 +1241,6 @@ class Decoder {
 		else throw new LogicException("NO LEXER SET");
 	} 
 
-
-	// DEBUG
-	private vec<Token> $tokens = vec<Token>[]; 
-	public function getTokens() : vec<Token> { return $this->tokens; }
-
 	public function handleToken(Token $token) : void { 
 
 		if($p = $this->parsers->lastValue()) { 
@@ -1281,11 +1250,9 @@ class Decoder {
 	}
 
 	public function parserPush(parserContext $parser) : void { 
-		\printf("PUSH\n"); // DEBUG
 		$this->parsers->add($parser); 
 	}
 	public function parserPop() : void { 
-		\printf("POP\n"); // DEBUG
 		$this->parsers->pop(); 
 	}
 
