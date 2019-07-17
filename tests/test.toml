@@ -1,15 +1,5 @@
-cock = "balls"
+[a]
+b = 1
 
-[test]
-tits = 123
-anus = [ 12.2, 13.3, ]
-
-[test.guy]
-test = '''
-a string'''
-
-[[arry]]
-dict = { 1 = 2, 3 = 4 }
-
-[[arry]]
-dict = 14
+[a.b]
+c = 2

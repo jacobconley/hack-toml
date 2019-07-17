@@ -3,7 +3,7 @@ namespace toml;
 require_once __DIR__."/../vendor/hh_autoload.hh";
 
 use \LogicException;
-use \HH\Lib\{ Str, Regex, Vec }; 
+use \HH\Lib\{ Str, Regex, Vec, Dict }; 
 
 class TOMLException extends \Exception {
 	public function __construct(?position $position, string $message) { 
@@ -147,15 +147,15 @@ class Token {
 				switch($this->text) { 
 					case "inf":
 					case "+inf":
-						return (float) INF;
+						return (float) 'INF';
 
 					case "-inf":
-						return (float) -INF;
+						return (float) '-INF';
 
 					case "nan":
 					case "+nan":
 					case "-nan":
-						return (float) NAN;
+						return (float) 'NAN';
 
 					default: break; 
 				}
@@ -624,15 +624,21 @@ class parserBase extends parserContext implements parser_value {
 		if($count == 0) throw new LogicException("Empty key");
 
 		else if($count == 1) { 
-			if(\array_key_exists($key[0], $dict)) throw new TOMLException($keyToken->getPosition(), \sprintf('Duplicate key "%s"', $this->keystr($key))); 
-			$dict[$key[0]] = $value; 
+			//if(\array_key_exists($key[0], $dict)) throw new TOMLException($keyToken->getPosition(), \sprintf('Duplicate key "%s"', $this->keystr($key))); 
+			$name = $key[0];
+			$obj = idx($dict, $name, dict<string,nonnull>[]);  
+
+			/* HH_IGNORE_ERROR[4101] Generics */
+			if(!($obj is dict)) throw new LogicException("Trying to add value to a non-dict");
+
+			/* HH_IGNORE_ERROR[4101] Generics */
+			if($value is dict)	$dict[$name] = Dict\merge($obj, $value); 
+			else 				$dict[$name] = $value; 
 			return;
 		}
 
 		else {
-
 			$x = $key[0];
-
 			$y = idx($dict, $x, dict<string,nonnull>[]); 
 
 			/* HH_IGNORE_ERROR[4101] Generics */
@@ -677,7 +683,11 @@ class parserBase extends parserContext implements parser_value {
 	public function addKeyValue(nonnull $value) : void { 
 		$dict = $this->dict; 
 		if($key = $this->key) {
-			if($token = $this->keyToken) $this->_addKV($key, $token, $value, inout $dict); 
+			if($token = $this->keyToken) { 
+				/* HH_IGNORE_ERROR[4101] Generics */
+				$this->decoder->getRootParser()->defineKey($key, $token, $value is dict);
+				$this->_addKV($key, $token, $value, inout $dict); 
+			}
 		}
 		else throw new LogicException("Handling value without key");
 
@@ -688,7 +698,11 @@ class parserBase extends parserContext implements parser_value {
 	public function appendKeyValue(dict<string, nonnull> $value) : void 	{ 
 		$dict = $this->dict; 
 		if($key = $this->key) {
-		 	if($token = $this->keyToken) $this->_appendKV($key, $token, $value, inout $dict); 
+		 	if($token = $this->keyToken) {
+				/* HH_IGNORE_ERROR[4101] Generics */
+				$this->decoder->getRootParser()->defineKey($key, $token, $value is dict, FALSE);
+		 		$this->_appendKV($key, $token, $value, inout $dict); 
+		 	}
 		 }
 		else throw new LogicException("Handling value without key");
 
@@ -789,6 +803,20 @@ class parserBase extends parserContext implements parser_value {
 	}
 }
 
+
+
+// Quick bullshit key-definition class I wrote 
+class keydefn { 
+	public bool $defined = FALSE; 				// Has the key been DIRECTLY defined?
+	public ?dict<string, keydefn> $children; 	// Children of the key 
+
+	public function __construct(bool $defined, ?dict<string, keydefn> $children = NULL) { 
+		$this->defined = $defined;
+		$this->children = $children; 
+	}
+}
+
+
 //
 // The special instance of the parser that is at the bottom of the stack 
 //
@@ -798,6 +826,74 @@ class parserRoot extends parserBase {
 	public function __construct(Decoder $decoder) {
 		parent::__construct($decoder);
 	}
+
+	private dict<string, keydefn> $definitions = dict<string, keydefn>[];
+
+	private function _defineKey(vec<string> $key, Token $keyToken, inout dict<string, keydefn> $defns, bool $asDict) : void { 
+		$count = \count($key); 
+		if($count == 0) throw new LogicException("Empty key in definition");
+
+		else if($count == 1) {
+			$name = $key[0];
+
+			// The key has already been defined, explicitly or otherwise
+			if(\array_key_exists($name, $defns)) {
+				$def = $defns[$name]; 
+
+				// It is explicitly redefined.  Error
+				if($def->defined) throw new TOMLException($keyToken->getPosition(), \sprintf("Duplicate key '%s'", $name));
+
+				// This probably isn't strictly necessary... 
+				if($asDict && $def->children is null) throw new LogicException("Making an implicit dict explicit which has no children");
+
+				// It was implicitly defined before and is now made explicit.
+				$def->defined = TRUE;
+				$defns[$name] = $def; 
+			}
+
+			// It is now being defined explicitly
+			else $defns[$name] = new keydefn(TRUE, $asDict ? dict<string, keydefn>[] : NULL);
+		}
+
+		else { 
+			// We're in an intermediate, implicit dict
+			$name = $key[0];  
+			$slice = Vec\slice($key, 1);
+
+			// If it has been implicitly defined, exit
+			if(\array_key_exists($name, $defns)) { 
+				$def = $defns[$name];
+				if($def->defined) throw new TOMLException($keyToken->getPosition(), \sprintf("Redefining table '%s'", $name)); 
+ 
+				$newmap = $def->children;
+				if($newmap is nonnull) $this->_defineKey($slice, $keyToken, inout $newmap, $asDict); 
+				else throw new LogicException("Defining children of an entry which has no child dict");
+				$def->children = $newmap;
+				$defns[$name] = $def; 
+			}
+
+			else { 
+				$newmap = dict<string, keydefn>[]; 
+				$this->_defineKey($slice, $keyToken, inout $newmap, $asDict); 
+				$defns[$name] = new keydefn(FALSE, $newmap); 	 
+			}
+		}
+	}
+
+	// Makes sure that a given key hasn't already been directly defined before insertion within a higher-level parser
+	// Throws a TOMLException on failure
+	// $dict: If TRUE, the top level definition is a dict
+	// $top: If TRUE, search all levels of the key, if FALSE, ignore the top level.  FALSE is used for appending in array-of-tables
+	public function defineKey(vec<string> $key, Token $keyToken, bool $asDict = FALSE, bool $top = TRUE) : void { 
+		$defns = $this->definitions;
+		$this->_defineKey($top ? $key : Vec\take($key, \count($key) - 1),    $keyToken, inout $defns, $asDict); 
+		$this->definitions = $defns;
+	}
+
+
+
+
+
 
 
 	public function handleToken(Token $token) : void { 
@@ -1156,7 +1252,11 @@ function positionString(position $position) : string { return \sprintf('(%d,%d)'
 
 class Decoder { 
 	private ?Lexer $lexer;
+
 	private Vector<parserContext> $parsers = Vector<parserContext>{};
+	public function getRootParser() : parserRoot { 
+		return $this->parsers[0] as parserRoot;
+	}
 
 	public function getLexer() : Lexer { 
 		if($lexer = $this->lexer) return $lexer;
