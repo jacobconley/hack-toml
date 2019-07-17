@@ -464,20 +464,23 @@ class StringHandler {
 
 			// Escape sequence
 			if($char == '\\' && !($this->literal)) { 
-				if($match = Regex\first_match($line, re"/^\\\\(U[a-fA-F0-9]{8}|u[a-fA-F0-9]{4}|.)/", $i + 1)) { 
+				$loc = tuple($lineNum, $i);
 
-					$char = $match[1][0];
+				if($match = Regex\first_match($line, re"/U[a-fA-F0-9]{8}|u[a-fA-F0-9]{4}|[\\\"bfnrt]/", $i + 1)) { 
+
+					$char = $match[0][0];
 
 					// Unicode encoding
 					if($char == 'u' || $char == 'U') { 
 						$len = ($char == 'u' ? 4 : 8);
-						for($x = 1; $x <= $len; $x += 2) $this->value .= \hexdec($match[1][$x].$match[1][$x + 1]);
+						for($x = 1; $x <= $len; $x += 2) $this->value .= \hexdec($match[0][$x].$match[0][$x + 1]);
 						$i += $len;
 						continue;
 					}
 
-					// Escape sequence
-					switch($match[1][0]) { 
+					// At this point, the escape sequence is a single character
+
+					switch($char) { 
 						case 'b': 	$this->value .= "\b";  break;
 						case 't': 	$this->value .= "\t";  break; 
 						case 'n': 	$this->value .= "\n";  break; 
@@ -488,11 +491,16 @@ class StringHandler {
 						default: throw new LogicException('Matched escape literal not handled in following switch');
 					}
 
-					$i += 2; 
+					// Should be incremented twice - will be incremented on continue
+					$i++; 
 					continue; 
 
 				}
-				else throw new TOMLException(tuple($lineNum, $i), "Unrecognized escape sequence '".$char."'"); 
+				else {
+					$char = $line[$i + 1]; 
+					if($char == "u" || $char == "U") throw new TOMLException($loc, "Incomplete unicode escape sequence");
+					else throw new TOMLException($loc, "Unrecognized escape character '".$char."'"); 
+				}
 			} 
 
 
@@ -608,16 +616,6 @@ class parserBase extends parserContext implements parser_value {
 		}
 		return $str; 
 	}
-
-	//TODO:  An is-key-defined map to keep track of keys that have not been directly defined but are still part of the dict structure
-	// It should be an object of the parser root that remains static, or else how would it handle nested contexts like tables?
-	// It needs to be only in addKV and not appendKV because of the nature of array-of-tables,
-	//  but then addKV needs to have a conditional to merge tables that already exist but have not been directly defined
-	//
-	// I think a separate nested dict would do the trick, mapping key: string => (defined: BOOL, children: ?dict<string>)
-	// That way a key can have children without being directly defined
-
-	//TODO: also: A key may sometimes be parsed as a float, causing invalid dotting - we need to handle that in KeyParser
 
 	private function _addKV(vec<string> $key, Token $keyToken, nonnull $value, inout dict<string,nonnull> $dict) : void { 
 		$count = \count($key);
@@ -863,7 +861,6 @@ class parserRoot extends parserBase {
 			// If it has been implicitly defined, exit
 			if(\array_key_exists($name, $defns)) { 
 				$def = $defns[$name];
-				if($def->defined) throw new TOMLException($keyToken->getPosition(), \sprintf("Redefining table '%s'", $name)); 
  
 				$newmap = $def->children;
 				if($newmap is nonnull) $this->_defineKey($slice, $keyToken, inout $newmap, $asDict); 
@@ -957,7 +954,12 @@ class parserKey extends parserContext {
 		if($this->expectKey) 
 		{ 
 			if($token->isKey()) { 
-				$this->keys[] = $token->getText(); 
+				if($token->getType() == tokenType::FLOAT) { 
+					// A funky conditional I had to add because of how I designed this parser (poorly)
+					// This could have been more elegant by desigining the lexer as a token stream - discussed in the readme
+					foreach(\explode('.', $token->getText()) as $x) $this->keys[] = $x; 
+				}
+				else $this->keys[] = $token->getText(); 
 				$this->expectKey = FALSE;
 			}
 			else throw new TOMLException($token->getPosition(), "Expected a key following the dot (.)"); 
@@ -1168,6 +1170,7 @@ class parserDictBody extends parserRoot {
 					$this->parent->handleKey($key, $token);
 					$this->key 		= NULL;
 					$this->opened 	= TRUE; 
+					$this->expectLineEnd = TRUE;
 					\printf("Opened dict: %s\n", $key[\count($key) - 1]); // DEBUG
 					return; 
 				}
@@ -1219,6 +1222,7 @@ class parserDictArrayBody extends parserRoot {
 					$this->parent->handleKey($key, $token);
 					$this->key 		= NULL;
 					$this->opened 	= TRUE;
+					$this->expectLineEnd = TRUE; 
 					return; 
 				}
 				else throw new TOMLException($token->getPosition(), "Expected a key in [[dictionary array]] declaration"); 
