@@ -1,7 +1,5 @@
 namespace toml;
 
-require_once __DIR__."/../vendor/hh_autoload.hh";
-
 use \LogicException;
 use \HH\Lib\{ Str, Regex, Vec, Dict }; 
 
@@ -1284,13 +1282,11 @@ class Decoder {
 	}
 
 
-	public function DecodeFile(string $filename, bool $use_include_path = FALSE, ?resource $context = NULL) : dict<string, nonnull> { 
+	public function DecodeStream(resource $file) : dict<string, nonnull> { 
 
 		$this->lexer = new Lexer($this); 
 		$this->parsers->add(new parserRoot($this));
 
-		$file = \fopen($filename, "r", $use_include_path, $context);
-		if($file === FALSE) throw new \Exception("FILE NOT FOUND");
 
 		while(! \feof($file)) { 
 			$this->parseBuffer(\fread($file, 1024));
@@ -1310,10 +1306,4 @@ class Decoder {
 	}
 
 	//TODO: Decode string 
-}
-
-
-// Main func
-function decodeFile(string $filename, bool $use_include_path = FALSE, ?resource $context = NULL) : dict<string, nonnull> { 
-	return (new Decoder())->DecodeFile($filename, $use_include_path, $context);
 }

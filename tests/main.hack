@@ -1,3 +1,4 @@
+require_once __DIR__."/../vendor/hh_autoload.hh";
 include __DIR__.'/../src/parse.hack'; 
 
 use toml\{ Decoder, token, TOMLException };
@@ -5,11 +6,10 @@ use toml\{ Decoder, token, TOMLException };
 <<__EntryPoint>>
 function main() : noreturn { 
 
-	$Decoder = new Decoder();
 
 	try { 
 		$time = \microtime(TRUE);
-		$result = $Decoder->DecodeFile(__DIR__.'/test.toml');
+		$result = toml_decode_file(__DIR__.'/test.toml');
 
 		echo "$time\n";
 		\printf("Done in %d ms\n", \microtime(TRUE) - $time);
