@@ -54,7 +54,12 @@ function testsuite_recur(dict<string, nonnull> $dict) : dict<string, nonnull> {
 		if($val is dict) 				return testsuite_recur($val); 
 		/* HH_IGNORE_ERROR[4101] Generics */
 		if($val is vec) {
-		/* HH_IGNORE_ERROR[4110] Generics */
+
+			// The test suite expects array-of-tables to be like a normal array
+			/* HH_IGNORE_ERROR[4101] Generics */
+			if(\count($val) && $val[0] is dict) return $val; 
+
+			/* HH_IGNORE_ERROR[4110] Generics */
 			return dict<string, nonnull>[ 'type' => 'array', 'value' => testsuite_array($val) ]; 
 		}
 
