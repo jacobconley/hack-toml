@@ -681,8 +681,8 @@ class parserBase extends parserContext implements parser_value {
 		$dict = $this->dict; 
 		if($key = $this->key) {
 			if($token = $this->keyToken) { 
-				/* HH_IGNORE_ERROR[4101] Generics */
-				$this->decoder->getRootParser()->defineKey($key, $token, $value is dict);
+				// /* HH_IGNORE_ERROR[4101] Generics */
+				// $this->decoder->getRootParser()->defineKey($key, $token, $value is dict);
 				$this->_addKV($key, $token, $value, inout $dict); 
 			}
 		}
@@ -877,6 +877,17 @@ class parserRoot extends parserBase {
 
 
 
+	public function addKeyValue(nonnull $value) : void { 
+		if($key = $this->key) {
+			if($token = $this->keyToken) { 
+				/* HH_IGNORE_ERROR[4101] Generics */
+				$this->defineKey($key, $token, $value is dict);
+				parent::addKeyValue($value); 
+			}
+			else throw new LogicException("No key token");
+		}
+		else throw new LogicException("No key in addKeyValue");
+	}
 
 
 

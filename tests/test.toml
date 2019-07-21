@@ -1,10 +1,4 @@
-thevoid = [[[[[]]]]]
+thing = "dude"
 
-[test]
-thing = "guy"
-
-[[dude]]
-bro = 123
-
-[[dude]]
-piss = 1234
+[guy]
+thing = "man"
