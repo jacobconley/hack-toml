@@ -385,8 +385,15 @@ class Lexer {
 			if($match = Regex\first_match($this->lineText, re"/^0x[0-9a-f_]+|^0o[0-7_]|^0b[01_]|^[\+-]?((inf|nan)|[0-9_]+(\.[0-9_]+)?([eE][\+-]?[0-9_]+)?)/")) 
 			{ 				
 				// Some funky tests we had to do in able to simplify the above regex
-				// I tried to do it with one big regex, terrible idea 
-				if($match[0][0] === '0' && Str\slice($match[0], 0, 2) !== '0o') throw new TOMLException($this->getPosition(), "Leading zeros are not allowed");
+				// I tried to do it with one big regex, didn't quite work out
+				// I'm sure it's possible but I'll deal with it later
+				// Or you can, kind reader! 
+				$slice = Str\slice($match[0], 0, 2);
+				if($match[0][0] === '0' 
+					&& $slice !== '0o' 
+					&& $slice !== '0x'
+					&& $slice !== '0b'
+					&& \count($match) == 1) throw new TOMLException($this->getPosition(), "Leading zeros are not allowed");
 				//TODO: Test for double underscores
 
 				if(!(Str\is_empty($match[2]) && Str\is_empty($match[3]) && Str\is_empty($match[4]))) 			$this->token(tokenType::FLOAT, $match[0]); 
@@ -464,44 +471,48 @@ class StringHandler {
 			$char = $line[$i];
 
 			// Escape sequence
+			// This code is kinda spaghetti, my bad
 			if($char == '\\' && !($this->literal)) { 
-				$loc = tuple($lineNum, $i);
+				$loc = tuple($lineNum, $i + 1);
+				$escr = $line[$i + 1]; 
 
-				if($match = Regex\first_match($line, re"/U[a-fA-F0-9]{8}|u[a-fA-F0-9]{4}|[\\\"bfnrt]/", $i + 1)) { 
+				// Crudely migrated this from the switch statement
+				// No idea why that didn't work... I thought string switches worked in hack ? 
+				if($escr == '\\') {
+					$this->value .= '\\';  	$i++; continue; 
+				}
+				else if($escr == 'b') { 
+					$this->value .= "\x08"; $i++; continue;
+				}
+				else if($escr == 't') {
+					$this->value .= "\t";  	$i++; continue; 
+				}
+				else if($escr == 'n') {
+					$this->value .= "\n";  	$i++; continue; 
+				}
+				else if($escr == 'f') {
+					$this->value .= "\f";  	$i++; continue; 
+				}
+				else if($escr == 'r') {
+					$this->value .= "\r";  	$i++; continue; 
+				}
+				else if($escr == '"') {
+					$this->value .= '"';   	$i++; continue; 
+				}
 
-					$char = $match[0][0];
+				else if($escr == "u" || $escr == "U") {
+					if($match = Regex\first_match($line, re"/U[a-fA-F0-9]{8}|u[a-fA-F0-9]{4}/", $i + 1)) { 
+						// Unicode encoding
+						$len = ($escr == 'u' ? 4 : 8);
+						$i += $len + 1;
 
-					// Unicode encoding
-					if($char == 'u' || $char == 'U') { 
-						$len = ($char == 'u' ? 4 : 8);
-						for($x = 1; $x <= $len; $x += 2) $this->value .= \hexdec($match[0][$x].$match[0][$x + 1]);
-						$i += $len;
+						$this->value .= \pack('H*', Str\slice($match[0], 1));
 						continue;
 					}
-
-					// At this point, the escape sequence is a single character
-
-					switch($char) { 
-						case 'b': 	$this->value .= "\b";  break;
-						case 't': 	$this->value .= "\t";  break; 
-						case 'n': 	$this->value .= "\n";  break; 
-						case 'f': 	$this->value .= "\f";  break; 
-						case 'r': 	$this->value .= "\r";  break; 
-						case '\\': 	$this->value .= "\\";  break; 
-						case '"': 	$this->value .= '"';   break; 
-						default: throw new LogicException('Matched escape literal not handled in following switch');
-					}
-
-					// Should be incremented twice - will be incremented on continue
-					$i++; 
-					continue; 
-
+					else throw new TOMLException($loc, "Incomplete unicode escape sequence");
 				}
-				else {
-					$char = $line[$i + 1]; 
-					if($char == "u" || $char == "U") throw new TOMLException($loc, "Incomplete unicode escape sequence");
-					else throw new TOMLException($loc, "Unrecognized escape character '".$char."'"); 
-				}
+					 
+				else throw new TOMLException($loc, "Unrecognized escape character '".$escr."'"); 
 			} 
 
 
