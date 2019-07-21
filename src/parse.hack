@@ -697,7 +697,7 @@ class parserBase extends parserContext implements parser_value {
 		if($key = $this->key) {
 		 	if($token = $this->keyToken) {
 				/* HH_IGNORE_ERROR[4101] Generics */
-				$this->decoder->getRootParser()->defineKey($key, $token, $value is dict, FALSE);
+				// $this->decoder->getRootParser()->defineKey($key, $token, $value is dict, FALSE);
 		 		$this->_appendKV($key, $token, $value, inout $dict); 
 		 	}
 		 }
@@ -1137,9 +1137,9 @@ class parserDictBody extends parserRoot {
 		else { 
 
 			// If there's another opening bracket, it's an array-of-dicts
-			if($token->getType == tokenType::OP_BRACKET_OPEN) { 
+			if($token->getType() == tokenType::OP_BRACKET_OPEN) { 
 				$this->parent->decoder->parserPop();
-				$this->parent->decoder->parserPush(new parserDictArrayBody($this->parent->decoder));
+				$this->parent->decoder->parserPush(new parserDictArrayBody($this->parent));
 				return; 
 			}
 
@@ -1175,6 +1175,7 @@ class parserDictArrayBody extends parserRoot {
 	}
 
 	private bool $opened = FALSE; 
+	private bool $finishingOpen = FALSE; // Expecting second closing bracket ( ] ) 
 
 	public function handleToken(Token $token) : void 
 	{
@@ -1182,7 +1183,7 @@ class parserDictArrayBody extends parserRoot {
 		if($this->opened)
 		{
 			// End of the dictionary 
-			if($token->getType() == tokenType::OP_DB_BRACKET_OPEN || $token->getType() == tokenType::EOF) 
+			if($token->getType() == tokenType::OP_BRACKET_OPEN || $token->getType() == tokenType::EOF) 
 			{ 
 				$this->pop(); 
 				$this->parent->appendKeyValue($this->dict); 
@@ -1201,7 +1202,17 @@ class parserDictArrayBody extends parserRoot {
 				else throw new TOMLException($token->getPosition(), "Expected a key in [[dictionary array]] declaration"); 
 			}
 
-			if($token->getType() == tokenType::OP_DB_BRACKET_CLOSE) {
+			if($this->finishingOpen && $token->getType() != tokenType::OP_BRACKET_CLOSE) throw new TOMLException($token->getPosition(), "Expected a double bracket ( ]] ) to finish declaring this table"); 
+
+
+			if($token->getType() == tokenType::OP_BRACKET_CLOSE) {
+
+				// A quick fix for when I had to remove the double bracket lex tokens
+				if(!($this->finishingOpen)) { 
+					$this->finishingOpen = TRUE;
+					return; 
+				}
+
 				if($key = $this->key) { 
 					$this->parent->handleKey($key, $token);
 					$this->key 		= NULL;
