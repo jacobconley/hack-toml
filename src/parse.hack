@@ -109,6 +109,13 @@ class Token {
 			case tokenType::OP_EQUALS:	return "equals sign (=)";
 			case tokenType::OP_DOT: 	return "dot (.)";
 
+			case tokenType::OP_BRACKET_OPEN:		return "Opening bracket ( [ )";
+			case tokenType::OP_BRACKET_CLOSE: 		return "Closing bracket ( ] )";
+			case tokenType::OP_DB_BRACKET_OPEN:		return "Opening double bracket ( [[ )";
+			case tokenType::OP_DB_BRACKET_CLOSE:	return "Closing double bracket ( ]] )";
+			case tokenType::OP_BRACE_OPEN:			return "Opening brace ( { )";
+			case tokenType::OP_BRACE_CLOSE:			return "Closing brace ( } )";
+
 			case valueType::INLINE_DICT:return "Inline table";
 			case valueType::ARRAY: 		return "Array";
 			case valueType::EMPTY: 		return "Empty";
@@ -334,10 +341,10 @@ class Lexer {
 			// Operators
 			//
 
-			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
-			if($match = $this->is('[[')) { $this->token(tokenType::OP_DB_BRACKET_OPEN, $match); 	continue; }
-			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
-			if($match = $this->is(']]')) { $this->token(tokenType::OP_DB_BRACKET_CLOSE, $match); 	continue; }
+			// /* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
+			// if($match = $this->is('[[')) { $this->token(tokenType::OP_DB_BRACKET_OPEN, $match); 	continue; }
+			// /* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
+			// if($match = $this->is(']]')) { $this->token(tokenType::OP_DB_BRACKET_CLOSE, $match); 	continue; }
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
 			if($match = $this->is('['))  { $this->token(tokenType::OP_BRACKET_OPEN, $match); 		continue; }
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
@@ -619,7 +626,7 @@ class parserBase extends parserContext implements parser_value {
 			$obj = idx($dict, $name, dict<string,nonnull>[]);  
 
 			/* HH_IGNORE_ERROR[4101] Generics */
-			if(!($obj is dict)) throw new LogicException("Trying to add value to a non-dict");
+			if(!($obj is dict)) throw new TOMLException($keyToken->getPosition(), \sprintf("Duplicate key '%s'", $key[$count - 1]));
 
 			/* HH_IGNORE_ERROR[4101] Generics */
 			if($value is dict)	$dict[$name] = Dict\merge($obj, $value); 
@@ -882,11 +889,6 @@ class parserRoot extends parserBase {
 				$this->decoder->parserPush($block);
 				return;
 
-			case tokenType::OP_DB_BRACKET_OPEN:
-				$block = new parserDictArrayBody($this);
-				$this->decoder->parserPush($block);
-				return; 
-
 
 			default:
 				parent::handleToken($token); 
@@ -1133,6 +1135,13 @@ class parserDictBody extends parserRoot {
 			else parent::handleToken($token); 
 		}
 		else { 
+
+			// If there's another opening bracket, it's an array-of-dicts
+			if($token->getType == tokenType::OP_BRACKET_OPEN) { 
+				$this->parent->decoder->parserPop();
+				$this->parent->decoder->parserPush(new parserDictArrayBody($this->parent->decoder));
+				return; 
+			}
 
 			// Finishing up the declaration stage - coupled to the below 
 
