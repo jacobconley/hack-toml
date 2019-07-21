@@ -377,10 +377,13 @@ class Lexer {
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
 			if($match = Regex\first_match($this->lineText, re"/^0x[0-9a-f_]+|^0o[0-7_]|^0b[01_]|^[\+-]?((inf|nan)|[0-9_]+(\.[0-9_]+)?([eE][\+-]?[0-9_]+)?)/")) 
 			{ 				
+				// Some funky tests we had to do in able to simplify the above regex
+				// I tried to do it with one big regex, terrible idea 
 				if($match[0][0] === '0' && Str\slice($match[0], 0, 2) !== '0o') throw new TOMLException($this->getPosition(), "Leading zeros are not allowed");
+				//TODO: Test for double underscores
 
 				if(!(Str\is_empty($match[2]) && Str\is_empty($match[3]) && Str\is_empty($match[4]))) 			$this->token(tokenType::FLOAT, $match[0]); 
-				else 																							$this->token(tokenType::INTEGER, $match[0]); 
+				else 													$this->token(tokenType::INTEGER, $match[0]); 
 
 				continue; 
 			}
