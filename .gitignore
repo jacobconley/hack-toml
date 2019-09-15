@@ -1,3 +1,5 @@
 *.sublime-workspace
+project.*
 vendor/
 tests/burntsushi
+composer.lock
