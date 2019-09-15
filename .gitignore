@@ -3,7 +3,6 @@ project.*
 .vscode
 
 tests/tmp.hack
-tests/main.hack 
 tests/test.toml 
 
 vendor/

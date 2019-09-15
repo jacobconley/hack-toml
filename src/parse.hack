@@ -681,10 +681,28 @@ class parserBase extends parserContext implements parser_value {
 			$y = idx($dict, $x, dict<string,nonnull>[]); 
 
 			/* HH_IGNORE_ERROR[4101] Generics */
-			if(!($y is dict)) throw new TOMLException($keyToken->getPosition(), \sprintf('"%s": %s is not a table', $this->keystr($key), $x));
-			/* HH_IGNORE_ERROR[4110] handled by the above*/
-			$this->_appendKV(Vec\slice($key, 1), $keyToken, $value, inout $y); 
-			$dict[$x] = $y;
+			if($y is vec) {
+
+				// Here we have to handle a 
+
+				$i = \count($y) -1; 
+				$z = $y[$i];
+
+				// Coupled to the below code - there's probably a better way 
+				/* HH_IGNORE_ERROR[4101] Generics */
+				if(!($z is dict)) throw new TOMLException($keyToken->getPosition(), \sprintf('"%s": %s is not a table within the parent array-of-tables', $this->keystr($key), $x));
+				/* HH_IGNORE_ERROR[4110] handled by the above*/
+				$this->_appendKV(Vec\slice($key, 1), $keyToken, $value, inout $z); 
+				$y[$i] = $z; 
+				$dict[$x] = $y; 
+
+			} else { 
+				/* HH_IGNORE_ERROR[4101] Generics */
+				if(!($y is dict)) throw new TOMLException($keyToken->getPosition(), \sprintf('"%s": %s is not a table', $this->keystr($key), $x));
+				/* HH_IGNORE_ERROR[4110] handled by the above*/
+				$this->_appendKV(Vec\slice($key, 1), $keyToken, $value, inout $y); 
+				$dict[$x] = $y;
+			}
 		}
 	}
 
