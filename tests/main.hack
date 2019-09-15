@@ -1,3 +1,5 @@
+#!/usr/bin/hhvm
+
 require_once __DIR__."/../vendor/hh_autoload.hh";
 include __DIR__.'/../src/parse.hack'; 
 
@@ -11,7 +13,6 @@ function main() : noreturn {
 		$time = \microtime(TRUE);
 		$result = toml_decode_file(__DIR__.'/test.toml');
 
-		echo "$time\n";
 		\printf("Done in %d ms\n", \microtime(TRUE) - $time);
 		echo " -- Result -- \n";
 		print_r($result); 
