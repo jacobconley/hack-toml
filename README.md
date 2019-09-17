@@ -1,9 +1,9 @@
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/jacobconley/hack-toml)
+
 hack-toml
 ====
 
 This small package provides an interface for reading [TOML](https://github.com/toml-lang/toml) files.  
-
-![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/jacobconley/hack-toml)
 
 
 Usage
