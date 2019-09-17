@@ -3,6 +3,7 @@ hack-toml
 
 This small package provides an interface for reading [TOML](https://github.com/toml-lang/toml) files.  
 
+![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/jacobconley/hack-toml)
 
 
 Usage
@@ -21,7 +22,7 @@ A stream object can also be decoded directly if needed by using `(new toml\Decod
 Testing
 ===
 
-This project is tested primarily with [BurntSushi's test suite](https://github.com/BurntSushi/toml-test).  The project is amazing and crucial to verifying this one - but we nonetheless had some issues with tests that came out as false negatives.  Instead of including the test suite as a submodule, I just cloned it in `tests/burntsushi/` - as of today (16 September, 2019) the test suite hasn't been updated in a year, so this should not be an issue in the short term.  
+This project is tested primarily with [BurntSushi's test suite](https://github.com/BurntSushi/toml-test).  The project is amazing and crucial to verifying this one - but we nonetheless had some issues with tests that came out as false negatives.  Instead of including the test suite as a submodule, I just cloned it in `tests/burntsushi/` - as of today (16 September, 2019) the test suite hasn't been updated in 9 months, so this should not be an issue in the short term.  
 
 Tests that I've determined to be a false negative were archived into the `tests/burntsushi/false-negative/` directory. For the 1.0 release I've verified each of these cases manually, but new tests for each of these cases should be remade in Hack language.  This will all need to be integrated into CI.  This is all addressed by issue #1, which must be resolved before any work continues after this version.  
 
