@@ -459,7 +459,7 @@ class StringHandler {
 			for($i = $offset; $i <= $max; $i++) { 
 				if(\ctype_space($line[$i])) continue; 
 
-				if($i == $max) return $max; // Line ended with no word characters
+				if($i == $max) return NULL; // Line ended with no word characters
 
 				$offset = $i; 
 				$this->trimmingWS = FALSE; 
@@ -467,12 +467,23 @@ class StringHandler {
 			}
 		}
 
-		for($i = $offset; $i < Str\length($line); $i++) { 
+		$imax = Str\length($line) - 1;
+		for($i = $offset; $i <= $imax; $i++) { 
 			$char = $line[$i];
 
 			// Escape sequence
 			// This code is kinda spaghetti, my bad
-			if($char == '\\' && !($this->literal)) { 
+			if($char == '\\' && !($this->literal)) 
+			{ 
+
+				// Handling line-ending backslash
+				if($i == $imax || \ctype_space(Str\slice($line, $i))) {
+					// Ignore the rest of this line and trim the whitespace from the starting line 
+					$this->trimmingWS = TRUE; 
+					return NULL; 
+				}
+
+				// Else, it's a normal escape sequence - get the first character to proceed
 				$loc = tuple($lineNum, $i + 1);
 				$escr = $line[$i + 1]; 
 
