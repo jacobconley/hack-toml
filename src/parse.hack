@@ -647,13 +647,29 @@ class parserBase extends parserContext implements parser_value {
 
 		else {
 			$x = $key[0];
-			$y = idx($dict, $x, dict<string,nonnull>[]); 
+			$y = idx($dict, $x, dict<string,nonnull>[]);
 
 			/* HH_IGNORE_ERROR[4101] Generics */
-			if(!($y is dict)) throw new TOMLException($keyToken->getPosition(), \sprintf('"%s": %s is not a table', $this->keystr($key), $x));
-			/* HH_IGNORE_ERROR[4110] handled by the above*/
-			$this->_addKV(Vec\slice($key, 1), $keyToken, $value, inout $y); 
-			$dict[$x] = $y;
+			if($y is vec) { 
+				// Handling an array-of-tables - using the most recent one 
+				// Coupled to the below code - there's probably a better way 
+				$i = \count($y) -1; 
+				$z = $y[$i];
+
+				/* HH_IGNORE_ERROR[4101] Generics */
+				if(!($z is dict)) throw new TOMLException($keyToken->getPosition(), \sprintf('"%s": %s is not a table within the parent array-of-tables', $this->keystr($key), $x));
+				/* HH_IGNORE_ERROR[4110] handled by the above*/
+				$this->_addKV(Vec\slice($key, 1), $keyToken, $value, inout $z); 
+				$y[$i] = $z; 
+				$dict[$x] = $y; 
+			} 
+			else {
+				/* HH_IGNORE_ERROR[4101] Generics */
+				if(!($y is dict)) throw new TOMLException($keyToken->getPosition(), \sprintf('"%s": %s is not a table', $this->keystr($key), $x));
+				/* HH_IGNORE_ERROR[4110] handled by the above*/
+				$this->_addKV(Vec\slice($key, 1), $keyToken, $value, inout $y); 
+				$dict[$x] = $y;
+			}
 		}
 	}
 
@@ -682,13 +698,9 @@ class parserBase extends parserContext implements parser_value {
 
 			/* HH_IGNORE_ERROR[4101] Generics */
 			if($y is vec) {
-
-				// Here we have to handle a 
-
 				$i = \count($y) -1; 
 				$z = $y[$i];
 
-				// Coupled to the below code - there's probably a better way 
 				/* HH_IGNORE_ERROR[4101] Generics */
 				if(!($z is dict)) throw new TOMLException($keyToken->getPosition(), \sprintf('"%s": %s is not a table within the parent array-of-tables', $this->keystr($key), $x));
 				/* HH_IGNORE_ERROR[4110] handled by the above*/
@@ -820,6 +832,7 @@ class parserBase extends parserContext implements parser_value {
 
 
 // Quick bullshit key-definition class I wrote 
+// Used to ensure that keys aren't duplicately defined - We need a contextful thing to look after this since keys can cross parse trees 
 class keydefn { 
 	public bool $defined = FALSE; 				// Has the key been DIRECTLY defined?
 	public ?dict<string, keydefn> $children; 	// Children of the key 
@@ -903,6 +916,24 @@ class parserRoot extends parserBase {
 		$this->definitions = $defns;
 	}
 
+
+
+
+	public function undefineChildrenOfKey(vec<string> $key) : void { 
+		$defns = $this->definitions; 
+		$count = \count($key);
+
+		for($i = 0; $i < $count; $i++){ 
+			if(!\array_key_exists($key[$i], $defns)) return; 
+
+			$def = $defns[$key[$i]];
+			$defns = $def->children;
+
+			if($i == $count - 1) { 
+				$def->children = dict<string, keydefn>[]; 
+			} 
+		}
+	}
 
 
 
@@ -1254,6 +1285,12 @@ class parserDictArrayBody extends parserRoot {
 				}
 
 				if($key = $this->key) { 
+
+					// Fix for bug discovered via `tests/burntsushi/valid/table-array-table-array.toml` test:
+					// 	Keys stay defined between instances of an array-of-tables
+					// 	So we added this undefine children function
+					$this->parent->undefineChildrenOfKey($key); 
+
 					$this->parent->handleKey($key, $token);
 					$this->key 		= NULL;
 					$this->opened 	= TRUE;
