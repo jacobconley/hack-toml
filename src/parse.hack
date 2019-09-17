@@ -1416,5 +1416,14 @@ class Decoder {
 		return $root->getDict();
 	}
 
-	//TODO: Decode string 
+	public function DecodeString(string $str) : dict<string, nonnull> { 
+		$this->lexer = new Lexer($this); 
+		$this->parsers->add(new parserRoot($this));
+
+		$this->parseBuffer($str); 
+		$lexer->EOF(); 
+
+		$root = ($this->parsers)[0] as parserRoot;
+		return $root->getDict(); 
+	}
 }
