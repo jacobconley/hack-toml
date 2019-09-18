@@ -1,1 +1,4 @@
-{ "roots": [ "src/", "tests/" ] }
+{ 
+    "roots": [ "src/" ],
+    "devRoots": [ "tests/" ]
+}

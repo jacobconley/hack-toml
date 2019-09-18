@@ -939,6 +939,7 @@ class parserRoot extends parserBase {
 
 			$def = $defns[$key[$i]];
 			$defns = $def->children;
+			if($defns == NULL) throw new LogicException("This key doesn't exist");
 
 			if($i == $count - 1) { 
 				$def->children = dict<string, keydefn>[]; 
@@ -1417,7 +1418,8 @@ class Decoder {
 	}
 
 	public function DecodeString(string $str) : dict<string, nonnull> { 
-		$this->lexer = new Lexer($this); 
+		$lexer = new Lexer($this); 
+		$this->lexer = $lexer;
 		$this->parsers->add(new parserRoot($this));
 
 		$this->parseBuffer($str); 
