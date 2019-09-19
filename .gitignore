@@ -2,5 +2,7 @@
 project.*
 .vscode
 
+vendor/
+
 tests/tmp.hack
 tests/test.toml 
