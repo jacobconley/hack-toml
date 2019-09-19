@@ -1,0 +1,18 @@
+string      = 'test' 
+int         = 123
+float       = 3.14
+bool        = true 
+datetime    = 1979-05-27T07:32:00Z
+
+
+[arrays]
+
+ints        = [ 1, 2, 5 ]
+
+[[arrays.table]]
+test1       = 'guy'
+test2       = 69
+
+[[arrays.table]]
+test1       = 'bree'
+test2       = 420 

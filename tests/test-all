@@ -1,0 +1,34 @@
+#!/bin/bash 
+cd "$( dirname ${BASH_SOURCE[0]} )"
+
+status=1
+
+cd burntsushi
+echo ----------
+echo "Running (selected) BurntSushi test suite tests..."
+echo ----------
+./toml-test -testdir "$(pwd)/tests" ./reader.hack
+if [ $? -ne 0 ]; then status=0; fi 
+cd ..
+
+
+testdirs="other/"
+echo ------------
+printf "Running HackTest on:\n\t"
+echo $testdirs 
+echo ------------
+for dir in $testdirs; do 
+    ../vendor/bin/hacktest $dir; 
+    if [ $? -ne 0 ]; then status=0; fi 
+done 
+
+
+echo
+echo ===================
+if [ $status -eq 1 ]; then 
+    echo "All tests passed."
+    exit 0
+else
+    echo "Some tests failed."
+    exit 1
+fi 

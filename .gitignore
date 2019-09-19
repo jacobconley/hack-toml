@@ -4,6 +4,3 @@ project.*
 
 tests/tmp.hack
 tests/test.toml 
-
-vendor/
-composer.lock
