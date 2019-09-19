@@ -19,14 +19,14 @@ For convenience, two methods are added to the global namespace -
 A stream object can also be decoded directly if needed by using `(new toml\Decoder())->DecodeStream(...)`.  
 
 
-DictionaryAccess object
+DictAccess object
 -----
 
 `dict<string,nonnull>` was chosen as the return type instead of `array` in light of the hhvm team's [previous stance on the matter](https://hhvm.com/blog/10649/improving-arrays-in-hack) and the fact that, since they broke PHP backwards compatibility, they likely won't continue to support a loose-typed array.  
 
 This also makes sense for security as TOML is largely designed to be a configuration format and the developer using this package should know at all times what the keys and data types are that they're reading.  
 
-For type safety and convenience, the `DictionaryAccess` object is provided.  It wraps around the `dict<string, nonnull>` object, providing the following methods:
+For type safety and convenience, the `DictAccess` object is provided.  It wraps around the `dict<string, nonnull>` object, providing the following methods:
 
 - `->exists(string $key) : bool` - Returns true if the given key has a value 
 - `->get(string $key) : nonnull` - Accesses the wrapped dictionary straight-up; equivalent to using the array access operator (`[$name]`)
