@@ -156,4 +156,65 @@ class DictAccess {
 		else throw DictAccessException::WrongType($offset, 'vec');
 
 	}
+
+
+
+
+	//
+	// Optionals
+	// 
+
+	// Primitives
+	public function _int(string $key) : ?int { 
+		if(! \array_key_exists($key, $this->dict)) return NULL; 
+		return $this->int($key); 
+	}
+	public function _string(string $key) : ?string { 
+		if(! \array_key_exists($key, $this->dict)) return NULL; 
+		return $this->string($key); 
+	}
+	public function _float(string $key) : ?float { 
+		if(! \array_key_exists($key, $this->dict)) return NULL; 
+		return $this->float($key); 
+	}
+	public function _bool(string $key) : ?bool { 
+		if(! \array_key_exists($key, $this->dict)) return NULL; 
+		return $this->bool($key); 
+	}
+	public function _DateTime(string $key) : ?DateTime { 
+		if(! \array_key_exists($key, $this->dict)) return NULL; 
+		return $this->int($key); 
+	}
+
+	// Lists
+	public function _intlist(string $key) : ?vec<int> { 
+		if(! \array_key_exists($key, $this->dict)) return NULL; 
+		return $this->intlist($key); 
+	}
+	public function _stringlist(string $key) : ?vec<string> { 
+		if(! \array_key_exists($key, $this->dict)) return NULL; 
+		return $this->stringlist($key); 
+	}
+	public function _floatlist(string $key) : ?vec<float> { 
+		if(! \array_key_exists($key, $this->dict)) return NULL; 
+		return $this->floatlist($key); 
+	}
+	public function _boollist(string $key) : ?vec<bool> { 
+		if(! \array_key_exists($key, $this->dict)) return NULL; 
+		return $this->boollist($key); 
+	}
+	public function _DateTimeList(string $key) : ?vec<DateTime> { 
+		if(! \array_key_exists($key, $this->dict)) return NULL; 
+		return $this->DateTimeList($key); 
+	}
+
+	// Dicts
+	public function _dict(string $key) : ?DictAccess { 
+		if(! \array_key_exists($key, $this->dict)) return NULL; 
+		return $this->dict($key); 
+	}
+	public function _dictlist(string $key) : ?vec<DictAccess> { 
+		if(! \array_key_exists($key, $this->dict)) return NULL; 
+		return $this->dictlist($key); 
+	}
 }
