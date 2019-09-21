@@ -183,7 +183,7 @@ class DictAccess {
 	}
 	public function _datetime(string $key) : ?DateTime { 
 		if(! \array_key_exists($key, $this->dict)) return NULL; 
-		return $this->int($key); 
+		return $this->datetime($key); 
 	}
 
 	// Lists

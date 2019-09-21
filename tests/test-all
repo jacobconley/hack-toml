@@ -3,7 +3,14 @@ cd "$( dirname ${BASH_SOURCE[0]} )"
 
 status=1
 
-echo "Running autoloader..."
+echo "Typechecker..."
+hh_client
+if [ $? -ne 0 ]; then 
+	echo "Typechecker failed.  Aborting"
+	exit 1
+fi
+
+echo "Autoloader..."
 pushd ..
 ./vendor/bin/hh-autoload
 popd
