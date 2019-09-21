@@ -38,7 +38,7 @@ Type-safe methods:
 - `->_int(string $key) : ?int` - Returns the value if it exists, or `NULL` otherwise 
 - `->_intlist(string $key) : ?vec<int>` - Returns the vec if it exists, or `NULL` otherwise
 
-The `int` in the above methods can also be replaced with any of the following types: `string`, `float`, `bool`, `datetime`, `dict`.  e.g `->bool($key) : bool`, `->_floatlist($key) : float`
+The `int` in the above methods can also be replaced with any of the following types: `string`, `float`, `bool`, `datetime`, `dict`.  e.g `->bool($key) : bool`, `->_floatlist($key) : ?vec<float>`
 
 For the optional methods, the null coalescing operator can be used to provide a default value, e.g. `$somedict->_int('somekey') ?? 42`
 
