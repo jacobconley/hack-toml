@@ -17,8 +17,8 @@ class DictAccess {
 
     private dict<string, nonnull> $dict;
 
-	public function __construct(dict<string, nonnull> $dict) { 
-		$this->dict	 = $dict; 
+	public function __construct(?dict<string, nonnull> $dict = NULL) { 
+		$this->dict	 = $dict ?? dict<string, nonnull>[]; 
 	}
 
     public function exists(string $offset) : bool { 
