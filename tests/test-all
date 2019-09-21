@@ -3,13 +3,10 @@ cd "$( dirname ${BASH_SOURCE[0]} )"
 
 status=1
 
-cd burntsushi
-echo ----------
-echo "Running (selected) BurntSushi test suite tests..."
-echo ----------
-./toml-test -testdir "$(pwd)/tests" ./reader.hack
-if [ $? -ne 0 ]; then status=0; fi 
-cd ..
+echo "Running autoloader..."
+pushd ..
+./vendor/bin/hh-autoload
+popd
 
 
 testdirs="other/"
@@ -22,6 +19,13 @@ for dir in $testdirs; do
     if [ $? -ne 0 ]; then status=0; fi 
 done 
 
+pushd burntsushi
+echo ----------
+echo "Running (selected) BurntSushi test suite tests..."
+echo ----------
+./toml-test -testdir "$(pwd)/tests" ./reader.hack
+if [ $? -ne 0 ]; then status=0; fi 
+popd
 
 echo
 echo ===================

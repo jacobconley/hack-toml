@@ -6,7 +6,11 @@ final class DictionaryInterfaceTest extends Facebook\HackTest\HackTest {
 
     public function testMain() : void { 
 
-        $x = new DictAccess(toml_decode_file(__DIR__.'/DictionaryInterfaceTest.toml'));
+        $x = toml\parseFile(__DIR__.'/DictionaryInterfaceTest.toml');
+
+        //
+        // Just testing the reader's accuracy
+        //
 
         expect($x->string('string'))->toBeSame('test');
         expect($x->int('int'))->toBeSame(123);
@@ -30,6 +34,21 @@ final class DictionaryInterfaceTest extends Facebook\HackTest\HackTest {
         expect($d1->int('test2'))->toEqual(69);
         expect($d2->string('test1'))->toEqual('bree');
         expect($d2->int('test2'))->toEqual(420);
-    }
 
+        
+        // Null tests
+
+        expect($x->_string('string'))->toBeSame('test');
+        expect($x->_string('gnirts'))->toBeNull();
+        expect($x->_int('int'))->toBeSame(123);
+        expect($x->_int('gnirts'))->toBeNull();
+        expect($x->_float('float'))->toBeSame(3.14);
+        expect($x->_float('gnirts'))->toBeNull();
+        expect($x->_bool('bool'))->toBeSame(true);
+        expect($x->_bool('gnirts'))->toBeNull();
+        // expect($x->_DateTime('datetime'))->toBeSame('test');
+        // expect($x->_DateTime('gnirts'))->toBeNull();
+
+        expect($x->_dict('aiosdjfos'))->toBeNull();
+    }
 }

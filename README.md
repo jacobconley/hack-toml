@@ -9,12 +9,12 @@ This small package provides an interface for reading [TOML](https://github.com/t
 Usage
 ====
 
-All TOML decoders return `dict<string, nonnull>`.  Canonically, a TOML document is an unordered list of key/value pairs. 
+All TOML decoders return a `DictAccess` object (see below).  Canonically, a TOML document is an unordered list of key/value pairs. 
 
-For convenience, two methods are added to the global namespace - 
+The following methods parse TOML:
 
-- `toml_decode(string $toml)` - Decodes a string of TOML, analogous to `json_decode` 
-- `toml_decode_file(string $path, bool $use_include_path = FALSE, ?resource context = NULL)` - Decodes a file - the arguments in this method are passed directly to `fopen`
+- `toml\parse(string $toml)` - Decodes a string of TOML
+- `toml\parseFile(string $path, bool $use_include_path = FALSE, ?resource context = NULL)` - Decodes a file - the arguments in this method are passed directly to `fopen`
 
 A stream object can also be decoded directly if needed by using `(new toml\Decoder())->DecodeStream(...)`.  
 
@@ -22,19 +22,28 @@ A stream object can also be decoded directly if needed by using `(new toml\Decod
 DictAccess object
 -----
 
-`dict<string,nonnull>` was chosen as the return type instead of `array` in light of the hhvm team's [previous stance on the matter](https://hhvm.com/blog/10649/improving-arrays-in-hack) and the fact that, since they broke PHP backwards compatibility, they likely won't continue to support a loose-typed array.  
+In light of the HHVM team's [stance on the legacy PHP array object](https://hhvm.com/blog/10649/improving-arrays-in-hack) and the fact that PHP compatibility is long gone, I opted to create the `DictAccess` object instead of the legacy type.  For version 1.0 a `dict<string,nonnull>` was used, but type safety for this proved too cumbersome in strict hack. This also makes sense for security as TOML is largely designed to be a configuration format and the developer using this package should know at all times what the keys and data types are that they're reading.  
 
-This also makes sense for security as TOML is largely designed to be a configuration format and the developer using this package should know at all times what the keys and data types are that they're reading.  
+The `DictAccess` object  wraps around the `dict<string, nonnull>` object, providing the below methods:
 
-For type safety and convenience, the `DictAccess` object is provided.  It wraps around the `dict<string, nonnull>` object, providing the following methods:
+Type-agnostic methods:
 
 - `->exists(string $key) : bool` - Returns true if the given key has a value 
 - `->get(string $key) : nonnull` - Accesses the wrapped dictionary straight-up; equivalent to using the array access operator (`[$name]`)
 
-- `->int(string $key) : int`, `->bool(string $key) : bool`, etc - Returns the value at $key as the appropriate type, and throws an exception if the value is unset or the wrong type
+Type-safe methods: 
+
+- `->int(string $key) : int`, etc - Returns the value at $key as the appropriate type, and throws an exception if the value is unset or the wrong type
 - `->intlist(string $key) : vec<int>`, etc - Returns a vec corresponding to the given key.  Like the above, but with a vec
-- `->dict(string $key) : DictionaryAccess` - Get a child dictionary like this one
-- `->dictlist(string $key) : vec<DictionaryAccess>`
+- `->_int(string $key) : ?int` - Returns the value if it exists, or `NULL` otherwise 
+- `->_intlist(string $key) : ?vec<int>` - Returns the vec if it exists, or `NULL` otherwise
+
+The `int` in the above methods can also be replaced with any of the following types: `string`, `float`, `bool`, `datetime`, `dict`.  e.g `->bool($key) : bool`, `->_floatlist($key) : float`
+
+For the optional methods, the null coalescing operator can be used to provide a default value, e.g. `$somedict->_int('somekey') ?? 42`
+
+`datetime` is represented by a [PHP `DateTime` object](https://www.php.net/manual/en/class.datetime.php), and `dict` corresponds to another `DictAccess` object.  
+
 
 
 Testing

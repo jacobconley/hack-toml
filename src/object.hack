@@ -60,11 +60,11 @@ class DictAccess {
 		else throw DictAccessException::WrongType($key, 'bool'); 
     }
 
-    public function DateTime(string $key) : DateTime { 
+    public function datetime(string $key) : DateTime { 
 		if(! \array_key_exists($key, $this->dict)) throw DictAccessException::DNE($key);
 		$x = $this->dict[$key];
 		if($x is DateTime) return $x; 
-		else throw DictAccessException::WrongType($key, 'DateTime'); 
+		else throw DictAccessException::WrongType($key, 'datetime'); 
     }
 
 
@@ -118,7 +118,7 @@ class DictAccess {
 		}
 		else throw DictAccessException::WrongType($offset, 'vec');
 	}
-	public function DateTimeList(string $offset) : vec<DateTime> { 
+	public function datetimelist(string $offset) : vec<DateTime> { 
 		if(! \array_key_exists($offset, $this->dict)) throw DictAccessException::DNE($offset);
 		$x = $this->dict[$offset];
 
@@ -181,7 +181,7 @@ class DictAccess {
 		if(! \array_key_exists($key, $this->dict)) return NULL; 
 		return $this->bool($key); 
 	}
-	public function _DateTime(string $key) : ?DateTime { 
+	public function _datetime(string $key) : ?DateTime { 
 		if(! \array_key_exists($key, $this->dict)) return NULL; 
 		return $this->int($key); 
 	}
@@ -203,9 +203,9 @@ class DictAccess {
 		if(! \array_key_exists($key, $this->dict)) return NULL; 
 		return $this->boollist($key); 
 	}
-	public function _DateTimeList(string $key) : ?vec<DateTime> { 
+	public function _datetimelist(string $key) : ?vec<DateTime> { 
 		if(! \array_key_exists($key, $this->dict)) return NULL; 
-		return $this->DateTimeList($key); 
+		return $this->datetimelist($key); 
 	}
 
 	// Dicts
