@@ -21,11 +21,13 @@ class DictAccess {
 		$this->dict	 = $dict ?? dict<string, nonnull>[]; 
 	}
 
-    public function exists(string $offset) : bool { 
+    public function has(string $offset) : bool { 
         return \array_key_exists($offset, $this->dict); 
     }
 
 	public function get(string $offset) : nonnull { return $this->dict[$offset]; }
+
+	public function keys() : keyset<string> { return HH\Lib\Keyset\keys($this->dict); }
 
 
 	//

@@ -35,6 +35,9 @@ final class DictionaryInterfaceTest extends Facebook\HackTest\HackTest {
         expect($d2->string('test1'))->toEqual('bree');
         expect($d2->int('test2'))->toEqual(420);
 
+        // Keys test
+        expect($child->keys())->toHaveSameContentAs( keyset[ 'ints', 'table' ]);
+
         
         // Null tests
 
