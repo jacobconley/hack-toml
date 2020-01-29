@@ -3,11 +3,11 @@
 	"description": "A TOML library for the Hack language",
 
 	"require": {
-		"hhvm/hsl": "^4.5",
-		"hhvm/hhvm-autoload": "^2.0"
+		"hhvm/hsl": "^4.40",
+		"hhvm/hhvm-autoload": "^2.0.11"
 	},
 	"require-dev": {
-		"hhvm/hacktest": "^1.6",
-		"facebook/fbexpect": "^2.6"
+		"hhvm/hacktest": "^2.0",
+		"facebook/fbexpect": "^2.7.3"
 	}
 }

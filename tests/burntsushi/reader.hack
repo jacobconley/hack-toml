@@ -34,7 +34,8 @@ function testsuite_val(mixed $val) : ?dict<string,string> {
 
 function testsuite_array(vec<nonnull> $vec) : vec<nonnull> { 
 	return Vec\map($vec, function(nonnull $val){ 
-		if($y = testsuite_val($val))	return $y;
+		$y= testsuite_val($val); 
+		if($y)	return $y;
 		/* HH_IGNORE_ERROR[4101] Generics */
 		/* HH_IGNORE_ERROR[4110] Generics */
 		else if($val is vec) 			return testsuite_array($val); 
@@ -48,7 +49,7 @@ function testsuite_array(vec<nonnull> $vec) : vec<nonnull> {
 function testsuite_recur(dict<string, nonnull> $dict) : dict<string, nonnull> { 
 	return Dict\map($dict, function(nonnull $val){
 
-		if($res = testsuite_val($val)) 	return $res; 
+		$res= testsuite_val($val); if($res) 	return $res; 
 		/* HH_IGNORE_ERROR[4101] Generics */
 		/* HH_IGNORE_ERROR[4110] Generics */
 		if($val is dict) 				return testsuite_recur($val); 

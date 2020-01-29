@@ -5,7 +5,7 @@ use \HH\Lib\{ Str, Regex, Vec, Dict };
 
 class TOMLException extends \Exception {
 	public function __construct(?position $position, string $message) { 
-		if($position = $position) parent::__construct('At '.positionString($position).': '.$message); 
+		if($position is nonnull) parent::__construct('At '.positionString($position).': '.$message); 
 		else parent::__construct($message); 
 	}
 }
@@ -145,7 +145,8 @@ class Token {
 	}
 
 	public function getValue() : nonnull { 
-		if($type = $this->getValueType()) {
+		$type = $this->getValueType();
+		if($type) {
 
 			// Special float values override before going into the main script;
 			if($type == valueType::FLOAT) { 				
@@ -231,7 +232,8 @@ class Lexer {
 	}
 
 	protected final function try<T as Regex\Match>(Regex\Pattern<T> $pattern) : ?Regex\Match { 		
-		if($match = Regex\first_match($this->lineText, $pattern, $this->n)) { 
+		$match  = Regex\first_match($this->lineText, $pattern, $this->n);
+		if($match) { 
 			/* HH_IGNORE_ERROR[4108] The field 0 is always defined - bad typechecker! */
 			$this->n += Str\length($match[0]); 
 			return $match;
@@ -259,7 +261,8 @@ class Lexer {
 
 
 	public final function EOL() : void { 
-		if($handler = $this->StringHandler) if($handler->isMultiline()) return; 
+		$handler = $this->StringHandler;
+		if($handler) if($handler->isMultiline()) return; 
 		$this->parent->handleToken(new Token(tokenType::EOL, $this->lineNum, 0));
 	}
 
@@ -285,9 +288,11 @@ class Lexer {
 
 			// First - see if there is a string context
 			// If there is, it will return a new $n offset to skip to if it finishes, or NULL which means it continues into the next line as well
-			if($handler = $this->StringHandler) { 
+			$handler = $this->StringHandler;
+			if($handler) { 
 				// Remember the string handler uses the entire line, as opposed to the main lexer which slices off each token
-				if($newOffset = $handler->handleLine($line, $lineNum, $n)) { 
+				$newOffset = $handler->handleLine($line, $lineNum, $n);
+				if($newOffset) { 
 					// String is ending, its token has already been handled by the StringHandler so we advance to the new offset
 					$this->StringHandler = NULL;
 					$this->n = $newOffset; 
@@ -310,28 +315,28 @@ class Lexer {
 			// 
 
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
-			if($match = $this->is('"""')) { 
+			$match = $this->is('"""'); if($match) { 
 				$this->StringHandler = new StringHandler($this, $this->getPosition(), $match);
 				$this->n += 3; // have to manually increment since we're not calling token 
 				continue;
 			}
 
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
-			if($match = $this->is("'''")) { 
+			$match = $this->is("'''"); if($match) { 
 				$this->StringHandler = new StringHandler($this, $this->getPosition(), $match);
 				$this->n += 3; // have to manually increment since we're not calling token 
 				continue;
 			}
 
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
-			if($match = $this->is('"')) {
+			$match = $this->is('"'); if($match) {
 				$this->StringHandler = new StringHandler($this, $this->getPosition(), $match);
 				$this->n++; // have to manually increment since we're not calling token 
 				continue;
 			}
 
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
-			if($match = $this->is("'")) { 
+			$match = $this->is("'"); if($match) { 
 				$this->StringHandler = new StringHandler($this, $this->getPosition(), $match);
 				$this->n++; // have to manually increment since we're not calling token 
 				continue;
@@ -342,23 +347,23 @@ class Lexer {
 			//
 
 			// /* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
-			// if($match = $this->is('[[')) { $this->token(tokenType::OP_DB_BRACKET_OPEN, $match); 	continue; }
+			// $match = $this->is('[['); if($match) { $this->token(tokenType::OP_DB_BRACKET_OPEN, $match);	continue; }
 			// /* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
-			// if($match = $this->is(']]')) { $this->token(tokenType::OP_DB_BRACKET_CLOSE, $match); 	continue; }
+			// $match = $this->is(']]'); if($match) { $this->token(tokenType::OP_DB_BRACKET_CLOSE, $match);	continue; }
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
-			if($match = $this->is('['))  { $this->token(tokenType::OP_BRACKET_OPEN, $match); 		continue; }
+			$match = $this->is('['); if($match)  { $this->token(tokenType::OP_BRACKET_OPEN, $match);		continue; }
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
-			if($match = $this->is(']'))  { $this->token(tokenType::OP_BRACKET_CLOSE, $match); 		continue; } 
+			$match = $this->is(']'); if($match)  { $this->token(tokenType::OP_BRACKET_CLOSE, $match);		continue; } 
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
-			if($match = $this->is('{'))  { $this->token(tokenType::OP_BRACE_OPEN, $match); 			continue; }
+			$match = $this->is('{'); if($match)  { $this->token(tokenType::OP_BRACE_OPEN, $match);			continue; }
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
-			if($match = $this->is('}'))  { $this->token(tokenType::OP_BRACE_CLOSE, $match); 		continue; } 
+			$match = $this->is('}'); if($match)  { $this->token(tokenType::OP_BRACE_CLOSE, $match);		continue; } 
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
-			if($match = $this->is('.'))  { $this->token(tokenType::OP_DOT, $match); 				continue; }
+			$match = $this->is('.'); if($match)  { $this->token(tokenType::OP_DOT, $match);				continue; }
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
-			if($match = $this->is('='))  { $this->token(tokenType::OP_EQUALS, $match); 				continue; }
+			$match = $this->is('='); if($match)  { $this->token(tokenType::OP_EQUALS, $match);				continue; }
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
-			if($match = $this->is(','))  { $this->token(tokenType::OP_COMMA, $match); 				continue; }
+			$match = $this->is(','); if($match)  { $this->token(tokenType::OP_COMMA, $match);				continue; }
 
 
 			//
@@ -366,23 +371,23 @@ class Lexer {
 			// 
 
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
-			if($match = $this->is('true')) 	{ $this->token(tokenType::BOOL, $match); 	continue; }
+			$match = $this->is('true'); if($match) 	{ $this->token(tokenType::BOOL, $match);	continue; }
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
-			if($match = $this->is('false')) { $this->token(tokenType::BOOL, $match); 	continue; }
+			$match = $this->is('false'); if($match) { $this->token(tokenType::BOOL, $match);	continue; }
 
 			// Datetime 
-			if($match = Regex\first_match($this->lineText, re"/^\d{4}-\d\d-\d\d((T| )\d\d:\d\d:\d\d(\.\d+)?)?(Z|((\+|-)\d\d:\d\d))?/")) { 
+			$match = Regex\first_match($this->lineText, re"/^\d{4}-\d\d-\d\d((T| )\d\d:\d\d:\d\d(\.\d+)?)?(Z|((\+|-)\d\d:\d\d))?/"); if($match) { 
 				$this->token(tokenType::DATETIME, $match[0]); 	
 				continue; 
 			}
-			if($match = Regex\first_match($this->lineText, re"/^\d\d:\d\d:\d\d(\.\d+)?/")) { 
+			$match = Regex\first_match($this->lineText, re"/^\d\d:\d\d:\d\d(\.\d+)?/"); if($match) { 
 				$this->token(tokenType::DATETIME, $match[0]); 	
 				continue; 
 			}
 
 			// Number
 			/* HH_IGNORE_ERROR[4276] $match will never be a falsy value */
-			if($match = Regex\first_match($this->lineText, re"/^0x[0-9a-f_]+|^0o[0-7_]|^0b[01_]|^[\+-]?((inf|nan)|[0-9_]+(\.[0-9_]+)?([eE][\+-]?[0-9_]+)?)/")) 
+			$match = Regex\first_match($this->lineText, re"/^0x[0-9a-f_]+|^0o[0-7_]|^0b[01_]|^[\+-]?((inf|nan)|[0-9_]+(\.[0-9_]+)?([eE][\+-]?[0-9_]+)?)/"); if($match) 
 			{ 				
 				// Some funky tests we had to do in able to simplify the above regex
 				// I tried to do it with one big regex, didn't quite work out
@@ -403,7 +408,7 @@ class Lexer {
 			}
 
 			// Bare keys
-			if($match = Regex\first_match($this->lineText, re"/^[a-zA-Z0-9_-]+\b/"))
+			$match = Regex\first_match($this->lineText, re"/^[a-zA-Z0-9_-]+\b/"); if($match)
 			{
 				$this->token(tokenType::KEY, $match[0]);
 				continue; 
@@ -512,7 +517,7 @@ class StringHandler {
 				}
 
 				else if($escr == "u" || $escr == "U") {
-					if($match = Regex\first_match($line, re"/U[a-fA-F0-9]{8}|u[a-fA-F0-9]{4}/", $i + 1)) { 
+					$match = Regex\first_match($line, re"/U[a-fA-F0-9]{8}|u[a-fA-F0-9]{4}/", $i + 1); if($match) { 
 						// Unicode encoding
 						$len = ($escr == 'u' ? 4 : 8);
 						$i += $len + 1;
@@ -731,8 +736,8 @@ class parserBase extends parserContext implements parser_value {
 
 	public function addKeyValue(nonnull $value) : void { 
 		$dict = $this->dict; 
-		if($key = $this->key) {
-			if($token = $this->keyToken) { 
+		$key= $this->key; if($key) {
+			$token= $this->keyToken; if($token) { 
 				// /* HH_IGNORE_ERROR[4101] Generics */
 				// $this->decoder->getRootParser()->defineKey($key, $token, $value is dict);
 				$this->_addKV($key, $token, $value, inout $dict); 
@@ -746,8 +751,8 @@ class parserBase extends parserContext implements parser_value {
 	}
 	public function appendKeyValue(dict<string, nonnull> $value) : void 	{ 
 		$dict = $this->dict; 
-		if($key = $this->key) {
-		 	if($token = $this->keyToken) {
+		$key= $this->key; if($key) {
+		 	$token= $this->keyToken; if($token) {
 				/* HH_IGNORE_ERROR[4101] Generics */
 				// $this->decoder->getRootParser()->defineKey($key, $token, $value is dict, FALSE);
 		 		$this->_appendKV($key, $token, $value, inout $dict); 
@@ -950,8 +955,8 @@ class parserRoot extends parserBase {
 
 
 	public function addKeyValue(nonnull $value) : void { 
-		if($key = $this->key) {
-			if($token = $this->keyToken) { 
+		$key= $this->key; if($key) {
+			$token= $this->keyToken; if($token) { 
 				/* HH_IGNORE_ERROR[4101] Generics */
 				$this->defineKey($key, $token, $value is dict);
 				parent::addKeyValue($value); 
@@ -1050,7 +1055,8 @@ class parserValue extends parserContext implements parser_value {
 	}
 
 	public function handleToken(Token $token) : void { 
-		if($type = $token->getValueType()) { 
+		$type = $token->getValueType();
+		if($type) { 
 			$this->decoder->parserPop();
 			$this->parent->handleValue($token, $token->getValue(), $type);
 			return; 
@@ -1234,7 +1240,9 @@ class parserDictBody extends parserRoot {
 			}
 
 			if($token->getType() == tokenType::OP_BRACKET_CLOSE) {
-				if($key = $this->key) { 
+				
+				$key = $this->key;
+				if($key) { 
 					$this->parent->handleKey($key, $token);
 					$this->key 		= NULL;
 					$this->opened 	= TRUE; 
@@ -1296,7 +1304,8 @@ class parserDictArrayBody extends parserRoot {
 					return; 
 				}
 
-				if($key = $this->key) { 
+				$key = $this->key;
+				if($key) { 
 
 					// Fix for bug discovered via `tests/burntsushi/valid/table-array-table-array.toml` test:
 					// 	Keys stay defined between instances of an array-of-tables
@@ -1347,13 +1356,14 @@ class Decoder {
 	}
 
 	public function getLexer() : Lexer { 
-		if($lexer = $this->lexer) return $lexer;
+		$lexer = $this->lexer;
+		if($lexer) return $lexer;
 		else throw new LogicException("NO LEXER SET");
 	} 
 
 	public function handleToken(Token $token) : void { 
 
-		if($p = $this->parsers->lastValue()) { 
+		$p= $this->parsers->lastValue(); if($p) { 
 			$p->handleToken($token); 
 		}
 		else throw new LogicException("No parsers on the stack"); 
@@ -1381,7 +1391,9 @@ class Decoder {
 
 			if($char == "\n") { 
 				$this->lineNum++; 
-				if($lexer = $this->lexer) {
+
+				$lexer = $this->lexer;
+				if($lexer) {
 					$lexer->handleLine($this->line, $this->lineNum); 
 					$lexer->EOL();
 				} 
@@ -1404,7 +1416,8 @@ class Decoder {
 			$this->parseBuffer(\fread($file, 1024));
 		}
 
-		if($lexer = $this->lexer) 
+		$lexer = $this->lexer;
+		if($lexer) 
 		{ 
 			if(!\ctype_space($this->line)) $lexer->handleLine($this->line, $this->lineNum); 
 			$lexer->EOF();
