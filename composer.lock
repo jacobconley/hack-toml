@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7c66f39520269d5dfa650370c49bb8ee",
+    "content-hash": "1e50aaf55070322152e402d57d23a073",
     "packages": [
         {
             "name": "hhvm/hhvm-autoload",
-            "version": "v2.0.11",
+            "version": "v3.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/hhvm/hhvm-autoload.git",
-                "reference": "2506257ca18034d01f7cfe424ae2cef91fe29881"
+                "reference": "ce6045f61aaed665e0250de399801921e86860e2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/hhvm/hhvm-autoload/zipball/2506257ca18034d01f7cfe424ae2cef91fe29881",
-                "reference": "2506257ca18034d01f7cfe424ae2cef91fe29881",
+                "url": "https://api.github.com/repos/hhvm/hhvm-autoload/zipball/ce6045f61aaed665e0250de399801921e86860e2",
+                "reference": "ce6045f61aaed665e0250de399801921e86860e2",
                 "shasum": ""
             },
             "require": {
@@ -47,11 +47,11 @@
             },
             "autoload": {
                 "classmap": [
-                    "src/ComposerPlugin.php"
+                    "ComposerPlugin.php"
                 ]
             },
             "notification-url": "https://packagist.org/downloads/",
-            "time": "2019-11-22T01:04:58+00:00"
+            "time": "2020-04-08T15:45:27+00:00"
         },
         {
             "name": "hhvm/hsl",
@@ -129,16 +129,16 @@
         },
         {
             "name": "facebook/fbexpect",
-            "version": "v2.7.3",
+            "version": "v2.7.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/hhvm/fbexpect.git",
-                "reference": "11a1fcf64286943382ac2496b4c8c981763c218d"
+                "reference": "02a831d27bc928460c1407e0d48d02d339b03798"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/hhvm/fbexpect/zipball/11a1fcf64286943382ac2496b4c8c981763c218d",
-                "reference": "11a1fcf64286943382ac2496b4c8c981763c218d",
+                "url": "https://api.github.com/repos/hhvm/fbexpect/zipball/02a831d27bc928460c1407e0d48d02d339b03798",
+                "reference": "02a831d27bc928460c1407e0d48d02d339b03798",
                 "shasum": ""
             },
             "require": {
@@ -149,7 +149,7 @@
             },
             "require-dev": {
                 "hhvm/hhast": "^4.0",
-                "hhvm/hhvm-autoload": "^2.0"
+                "hhvm/hhvm-autoload": "^2.0|^3.0"
             },
             "type": "library",
             "notification-url": "https://packagist.org/downloads/",
@@ -157,31 +157,31 @@
                 "MIT"
             ],
             "description": "Unit test helpers for Facebook projects",
-            "time": "2019-11-04T22:11:28+00:00"
+            "time": "2020-04-23T03:58:41+00:00"
         },
         {
             "name": "facebook/hh-clilib",
-            "version": "v2.2.4",
+            "version": "v2.3.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/hhvm/hh-clilib.git",
-                "reference": "7e5a0acdae42ab33b332f94f43cfcf25636bddee"
+                "reference": "10845e8780436728cdc0b9abbe20446777bdb199"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/hhvm/hh-clilib/zipball/7e5a0acdae42ab33b332f94f43cfcf25636bddee",
-                "reference": "7e5a0acdae42ab33b332f94f43cfcf25636bddee",
+                "url": "https://api.github.com/repos/hhvm/hh-clilib/zipball/10845e8780436728cdc0b9abbe20446777bdb199",
+                "reference": "10845e8780436728cdc0b9abbe20446777bdb199",
                 "shasum": ""
             },
             "require": {
-                "hhvm": "^4.13",
+                "hhvm": "^4.41",
                 "hhvm/hsl": "^4.0",
-                "hhvm/hsl-experimental": "^4.0",
+                "hhvm/hsl-experimental": "^4.50",
                 "hhvm/type-assert": "^3.2"
             },
             "require-dev": {
                 "facebook/fbexpect": "^2.6.1",
-                "hhvm/hacktest": "^1.0.0",
+                "hhvm/hacktest": "^2.0",
                 "hhvm/hhast": "^4.0.2"
             },
             "type": "library",
@@ -194,27 +194,28 @@
             "license": [
                 "MIT"
             ],
-            "time": "2019-11-07T21:21:31+00:00"
+            "time": "2020-03-27T16:47:22+00:00"
         },
         {
             "name": "hhvm/hacktest",
-            "version": "v2.0.0",
+            "version": "v2.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/hhvm/hacktest.git",
-                "reference": "2c70f92f235ea5bfb4d2d6f99ed83e44484cdcdf"
+                "reference": "15663bc7fb2b35e1ab7c48089db7e674ac024482"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/hhvm/hacktest/zipball/2c70f92f235ea5bfb4d2d6f99ed83e44484cdcdf",
-                "reference": "2c70f92f235ea5bfb4d2d6f99ed83e44484cdcdf",
+                "url": "https://api.github.com/repos/hhvm/hacktest/zipball/15663bc7fb2b35e1ab7c48089db7e674ac024482",
+                "reference": "15663bc7fb2b35e1ab7c48089db7e674ac024482",
                 "shasum": ""
             },
             "require": {
-                "facebook/hh-clilib": "^2.0.0",
-                "hhvm": "^4.6",
-                "hhvm/hhvm-autoload": "^2.0.2",
+                "facebook/hh-clilib": "^2.3.0",
+                "hhvm": "^4.41",
+                "hhvm/hhvm-autoload": "^2.0.2|^3.0",
                 "hhvm/hsl": "^4.0",
+                "hhvm/hsl-experimental": "^4.50",
                 "hhvm/type-assert": "^3.2"
             },
             "require-dev": {
@@ -228,7 +229,7 @@
             "type": "library",
             "extra": {
                 "branch-alias": {
-                    "dev-master": "1.x-dev"
+                    "dev-master": "2.x-dev"
                 }
             },
             "notification-url": "https://packagist.org/downloads/",
@@ -236,30 +237,30 @@
                 "MIT"
             ],
             "description": "The Hack Test Library",
-            "time": "2019-10-25T16:00:51+00:00"
+            "time": "2020-03-27T17:07:28+00:00"
         },
         {
             "name": "hhvm/hsl-experimental",
-            "version": "v4.37.1",
+            "version": "v4.50.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/hhvm/hsl-experimental.git",
-                "reference": "ffbafdfc3d53fc1426f8e88129513e20320c95bb"
+                "reference": "ddbd74463878f0bda076bf7e1c528eb1294b3769"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/hhvm/hsl-experimental/zipball/ffbafdfc3d53fc1426f8e88129513e20320c95bb",
-                "reference": "ffbafdfc3d53fc1426f8e88129513e20320c95bb",
+                "url": "https://api.github.com/repos/hhvm/hsl-experimental/zipball/ddbd74463878f0bda076bf7e1c528eb1294b3769",
+                "reference": "ddbd74463878f0bda076bf7e1c528eb1294b3769",
                 "shasum": ""
             },
             "require": {
-                "hhvm": "^4.25",
+                "hhvm": "^4.41",
                 "hhvm/hsl": "^4.15"
             },
             "require-dev": {
                 "facebook/fbexpect": "^2.7.0",
                 "hhvm/hacktest": "^2.0",
-                "hhvm/hhvm-autoload": "^2.0"
+                "hhvm/hhvm-autoload": "^2.0|^3.0"
             },
             "type": "library",
             "extra": {
@@ -272,7 +273,7 @@
                 "MIT"
             ],
             "description": "The Hack Standard Library - Experimental Additions",
-            "time": "2020-01-27T22:15:58+00:00"
+            "time": "2020-04-16T20:59:00+00:00"
         },
         {
             "name": "hhvm/type-assert",

@@ -4,7 +4,7 @@
 
 	"require": {
 		"hhvm/hsl": "^4.40",
-		"hhvm/hhvm-autoload": "^2.0.11"
+		"hhvm/hhvm-autoload": "^3.01"
 	},
 	"require-dev": {
 		"hhvm/hacktest": "^2.0",
