@@ -6,7 +6,9 @@ final class DictionaryInterfaceTest extends Facebook\HackTest\HackTest {
 
     public function testMain() : void { 
 
-        $x = toml\parseFile(__DIR__.'/DictionaryInterfaceTest.toml');
+        $x = new DictAccess(toml\parseFile(__DIR__.'/DictionaryInterfaceTest.toml'));
+        // This is left over from the previous API; needs to be converted to shapes 
+        // This test is garbage anyways
 
         //
         // Just testing the reader's accuracy

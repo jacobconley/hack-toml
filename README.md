@@ -9,7 +9,7 @@ This small package provides an interface for reading [TOML](https://github.com/t
 Usage
 ====
 
-All TOML decoders return a `DictAccess` object (see below).  Canonically, a TOML document is an unordered list of key/value pairs. 
+All TOML decoders return a `dict<string, nonnull>`.  Canonically, a TOML document is an unordered list of key/value pairs. 
 
 The following methods parse TOML:
 
@@ -19,30 +19,42 @@ The following methods parse TOML:
 A stream object can also be decoded directly if needed by using `(new toml\Decoder())->DecodeStream(...)`.  
 
 
-DictAccess object
------
+Type Safety
+====
 
-In light of the HHVM team's [stance on the legacy PHP array object](https://hhvm.com/blog/10649/improving-arrays-in-hack) and the fact that PHP compatibility is long gone, I opted to create the `DictAccess` object instead of the legacy type.  For version 1.0 a `dict<string,nonnull>` was used, but type safety for this proved too cumbersome in strict hack. This also makes sense for security as TOML is largely designed to be a configuration format and the developer using this package should know at all times what the keys and data types are that they're reading.  
+One of the central features of the Hack language is the strong typing; this is a very necessary evil.  Meanwhile, Hack has been undergoing rapid development lately, and the new `dict` type is just the latest example of this.
 
-The `DictAccess` object  wraps around the `dict<string, nonnull>` object, providing the below methods:
+Currently, the standard way to get a type-safe dictionary mapping from a `dict` like this is to use [type-assert](https://github.com/hhvm/type-assert) and [shapes](https://docs.hhvm.com/hack/built-in-types/shapes).
 
-Type-agnostic methods:
+A shape can be passed as the generic argument to the `match<T>($dict)` functions in type-assert, as in the below example.  
+Recall from the hhvm docs above that you can prepend the `?` operator to a shape key name to make that field optional, which is different from making its value optional.
 
-- `->exists(string $key) : bool` - Returns true if the given key has a value 
-- `->get(string $key) : nonnull` - Accesses the wrapped dictionary straight-up; equivalent to using the array access operator (`[$name]`)
+```
+type s1 = shape(
+    'name'          => string,
+    ?'nickname'     => string,
+    'id'            => int
+);
 
-Type-safe methods: 
+$dict = dict<string, mixed>[
+    'name'          => 'john',
+    id              => 32
+];
 
-- `->int(string $key) : int`, etc - Returns the value at $key as the appropriate type, and throws an exception if the value is unset or the wrong type
-- `->intlist(string $key) : vec<int>`, etc - Returns a vec corresponding to the given key.  Like the above, but with a vec
-- `->_int(string $key) : ?int` - Returns the value if it exists, or `NULL` otherwise 
-- `->_intlist(string $key) : ?vec<int>` - Returns the vec if it exists, or `NULL` otherwise
+$dict = TypeCoerce\match<s1>($dict)
+```
 
-The `int` in the above methods can also be replaced with any of the following types: `string`, `float`, `bool`, `datetime`, `dict`.  e.g `->bool($key) : bool`, `->_floatlist($key) : ?vec<float>`
+which yields the below object with the appropiate type safety, which can be accessed just like a dict or old-school PHP array. 
 
-For the optional methods, the null coalescing operator can be used to provide a default value, e.g. `$somedict->_int('somekey') ?? 42`
+```
+    [name]  => john,
+    [id]    => 32
+```
 
-`datetime` is represented by a [PHP `DateTime` object](https://www.php.net/manual/en/class.datetime.php), and `dict` corresponds to another `DictAccess` object.  
+Some other tips:
+- `TypeAssert\matches` will attempt to convert the values strictly with regards to their type; `TypeCoerce\match` will attempt to perform type juggling (such as string-to-int conversions) 
+- For now, I've been using `array_key_exists('key', $dict)` to test for a key's presence, but
+- The null-coalescing operator `??` can be used to specify default values for keys that don't exist
 
 
 
